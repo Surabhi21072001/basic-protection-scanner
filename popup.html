@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic Protection Scanner</title>
+  <style>
+    /* Simple, readable popup styling. */
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      width: 240px;
+      margin: 0;
+      padding: 14px 16px;
+      color: #1a1a1a;
+    }
+    h1 {
+      font-size: 15px;
+      margin: 0 0 4px 0;
+    }
+    .status {
+      font-size: 12px;
+      color: #0a7d28;
+      margin-bottom: 12px;
+    }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 6px 0;
+      border-top: 1px solid #eee;
+    }
+    .stat .value {
+      font-weight: 600;
+    }
+    .harmful .value {
+      color: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <h1>Basic Protection Scanner</h1>
+  <!-- "Scanner active" indicator -->
+  <div class="status" id="status">Scanner active</div>
+
+  <!-- Total text blocks scanned -->
+  <div class="stat">
+    <span>Text blocks scanned</span>
+    <span class="value" id="scanned">0</span>
+  </div>
+
+  <!-- Number of harmful matches found -->
+  <div class="stat harmful">
+    <span>Harmful matches</span>
+    <span class="value" id="harmful">0</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

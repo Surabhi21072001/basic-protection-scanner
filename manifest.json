@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Basic Protection Scanner",
+  "version": "1.0.0",
+  "description": "Version 1 prototype: scans visible webpage text and detects harmful language using a simple local keyword list.",
+
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+
+  "action": {
+    "default_title": "Basic Protection Scanner",
+    "default_popup": "popup.html"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["detector.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
