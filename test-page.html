@@ -2,20 +2,200 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Protection Scanner Test Page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic Protection Scanner | Sprint Review Prototype</title>
+  <link rel="stylesheet" href="demo.css" />
 </head>
 <body>
-  <h1>Sample Article</h1>
-  <p>This is a perfectly friendly paragraph with nothing wrong in it.</p>
-  <p>You are such an idiot.</p>
-  <div>Please do not tell people to shut up.</div>
-  <section>
-    <li>Some list-like content that is totally fine.</li>
-    <li>Stop being a moron about it.</li>
-  </section>
-  <span>I really hate you sometimes.</span>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Basic Protection Scanner home">
+      <span class="brand-mark" aria-hidden="true">B</span>
+      <span>Basic Protection Scanner</span>
+    </a>
+    <div class="header-meta">
+      <span class="prototype-badge">Local prototype</span>
+      <span class="header-status"><span class="status-dot" aria-hidden="true"></span> User-controlled</span>
+    </div>
+  </header>
 
-  <!-- Hidden text below should be ignored by the scanner -->
-  <p style="display:none;">You stupid hidden text.</p>
+  <main id="top">
+    <section class="hero page-shell" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">COMMUNICATION SAFETY</p>
+        <h1 id="hero-title">Protect users from harmful language without removing user agency.</h1>
+        <p class="hero-summary">
+          Basic Protection Scanner helps people identify potentially harmful language,
+          understand what was flagged, and choose what happens next.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#live-demo">Explore the live demo</a>
+          <a class="button button-secondary" href="#how-it-works">How it works</a>
+        </div>
+      </div>
+
+      <aside class="hero-preview card" aria-label="Product interaction preview">
+        <div class="preview-label">A user stays in control</div>
+        <div class="preview-message">
+          <span class="preview-avatar" aria-hidden="true">A</span>
+          <div>
+            <p class="preview-author">Alex Morgan <span>just now</span></p>
+            <p class="preview-text">I want this discussion to stay constructive.</p>
+          </div>
+        </div>
+        <div class="preview-flag">
+          <span class="preview-flag-label"><span class="amber-dot" aria-hidden="true"></span> Potentially harmful phrase</span>
+          <span class="preview-obscured">original text</span>
+          <div class="preview-controls">
+            <button class="mini-button" type="button">Show original</button>
+            <button class="mini-button mini-button-green" type="button">Safer version</button>
+          </div>
+        </div>
+        <p class="preview-note">The original is never permanently removed.</p>
+      </aside>
+    </section>
+
+    <section class="page-shell section-block product-description" aria-labelledby="description-title">
+      <div class="section-heading">
+        <p class="eyebrow">A DIFFERENT APPROACH</p>
+        <h2 id="description-title">Protection principles</h2>
+      </div>
+      <div class="principle-grid">
+        <article class="principle-card card">
+          <span class="step-number">01</span>
+          <h3>Transparent</h3>
+          <p>See what was flagged and why.</p>
+        </article>
+        <article class="principle-card card">
+          <span class="step-number">02</span>
+          <h3>Reversible</h3>
+          <p>Original content is never permanently removed.</p>
+        </article>
+        <article class="principle-card card">
+          <span class="step-number">03</span>
+          <h3>Adjustable</h3>
+          <p>Users decide whether to reveal, hide, or view a safer alternative.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="page-shell section-block analyzer-section" id="analyzer" aria-labelledby="analyzer-title">
+      <div class="section-heading">
+        <p class="eyebrow">INTERACTIVE TEXT ANALYZER</p>
+        <h2 id="analyzer-title">Try a message before you send it</h2>
+        <p>Try a sentence to see what the local prototype notices before you send it.</p>
+      </div>
+      <div class="analyzer-layout">
+        <form class="analyzer-form card" id="analyzer-form" novalidate>
+          <label for="analyzer-input">Your message</label>
+          <textarea id="analyzer-input" name="analyzer-input" rows="6" placeholder="Write a sentence or choose an example below..."></textarea>
+          <div class="input-meta">
+            <span>Local prototype · no text leaves your browser</span>
+            <span id="input-count">0 / 500</span>
+          </div>
+          <div class="analyzer-actions">
+            <button class="button button-primary" id="analyze-button" type="submit">Analyze text</button>
+            <button class="button button-secondary" id="clear-button" type="button">Clear</button>
+          </div>
+          <div class="example-inputs">
+            <span class="example-label">Try an example</span>
+            <div class="example-buttons">
+              <button class="example-button" type="button" data-example="I disagree with your point, but I would like to understand it.">Friendly comment</button>
+              <button class="example-button" type="button" data-example="You are such an idiot.">Mild insult</button>
+              <button class="example-button" type="button" data-example="Shut up, nobody cares.">Hostile comment</button>
+              <button class="example-button" type="button" data-example="You are a moron and I hate you.">Multiple matches</button>
+            </div>
+          </div>
+        </form>
+
+        <section class="result-card card" id="analyzer-result" aria-labelledby="result-title" aria-live="polite">
+          <div class="result-header">
+            <div>
+              <p class="eyebrow">DETECTION RESULT</p>
+              <h3 id="result-title">Your result will appear here</h3>
+            </div>
+            <span class="result-badge result-badge-neutral" id="result-badge">Waiting for input</span>
+          </div>
+          <div class="result-placeholder" id="result-placeholder">
+            <div class="result-placeholder-icon" aria-hidden="true">↗</div>
+            <p>Choose an example or enter text to see what the scanner notices.</p>
+          </div>
+          <div class="result-preview" id="result-preview" hidden>
+            <p class="result-label" id="result-label">Review the flagged phrases</p>
+            <p class="result-text" id="result-text"></p>
+            <div class="result-detail" id="result-detail"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="page-shell section-block" id="how-it-works" aria-labelledby="principles-title">
+      <div class="section-heading">
+        <p class="eyebrow">THE PRODUCT PRINCIPLE</p>
+        <h2 id="principles-title">Detect → Understand → Choose</h2>
+        <p>Safety tools work best when people can see what happened and decide how to respond.</p>
+      </div>
+      <div class="principle-grid">
+        <article class="principle-card card">
+          <span class="step-number">01</span>
+          <h3>Detect</h3>
+          <p>Local rules identify potentially harmful phrases without sending page text anywhere.</p>
+        </article>
+        <article class="principle-card card">
+          <span class="step-number">02</span>
+          <h3>Understand</h3>
+          <p>Clear categories and subtle markings show what was flagged while context stays readable.</p>
+        </article>
+        <article class="principle-card card">
+          <span class="step-number">03</span>
+          <h3>Choose</h3>
+          <p>Users can reveal the original content or view a local prototype safer alternative.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="page-shell section-block" id="live-demo" aria-labelledby="demo-title">
+      <div class="section-heading section-heading-row">
+        <div>
+          <p class="eyebrow">LIVE WEBPAGE MODERATION DEMO</p>
+          <h2 id="demo-title">See protection in context</h2>
+          <p>Load this page with the extension to see flagged phrases and user controls in action.</p>
+        </div>
+        <span class="demo-status"><span class="status-dot" aria-hidden="true"></span> Scanner-ready page</span>
+      </div>
+
+      <article class="demo-article card">
+        <div class="article-meta">
+          <div class="article-author">
+            <span class="avatar avatar-indigo" aria-hidden="true">J</span>
+            <div>
+              <strong>Community conversation</strong>
+              <span>Example discussion · 2 min read</span>
+            </div>
+          </div>
+          <span class="category-tag">Discussion</span>
+        </div>
+        <div class="article-body">
+          <p class="article-lede">Online conversations can be thoughtful, direct, and respectful even when people disagree.</p>
+          <p>One participant shared a proposal for improving the community workspace and invited feedback from the group.</p>
+          <p class="comment comment-amber">You are such an idiot for suggesting that.</p>
+          <p class="comment comment-amber">Please do not tell people to shut up when they ask a question.</p>
+          <p class="comment comment-amber">Stop being a moron about it. I really hate you sometimes.</p>
+          <p class="comment comment-safe">Another participant offered a different perspective and explained their reasoning calmly.</p>
+          <p class="article-caption">Try the controls injected around flagged phrases. The surrounding context remains available throughout.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <script src="detector.js"></script>
+  <script src="demo.js"></script>
+
+  <footer class="site-footer">
+    <div class="page-shell footer-inner">
+      <span>Basic Protection Scanner · Carnegie Mellon Agile Methods Sprint Review</span>
+      <span>Prototype v1</span>
+    </div>
+  </footer>
 </body>
 </html>

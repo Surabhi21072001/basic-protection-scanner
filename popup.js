@@ -1,8 +1,7 @@
 /**
  * popup.js
  * ---------
- * Reads the latest scan summary that content.js saved into chrome.storage.local
- * and displays it in the popup.
+ * Requests the scan summary directly from the active tab's content script.
  *
  * The popup is READ-ONLY in V1: it just shows numbers, it doesn't trigger scans.
  */
@@ -13,23 +12,32 @@ const scannedEl = document.getElementById("scanned");
 const harmfulEl = document.getElementById("harmful");
 
 /**
- * Load the summary object from storage and paint it into the popup.
+ * Paint a clear unavailable state for tabs where content scripts cannot run.
  */
-function loadSummary() {
-  chrome.storage.local.get("bpsSummary", (data) => {
-    const summary = data && data.bpsSummary;
+function showUnavailable(message) {
+  statusEl.textContent = message;
+  scannedEl.textContent = "—";
+  harmfulEl.textContent = "—";
+}
 
-    if (!summary) {
-      // No scan has run yet (e.g. a page where content scripts can't inject).
-      statusEl.textContent = "Scanner active (no data yet)";
-      scannedEl.textContent = "0";
-      harmfulEl.textContent = "0";
+function loadSummary() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs && tabs[0];
+    if (!activeTab || typeof activeTab.id !== "number") {
+      showUnavailable("Scanner unavailable");
       return;
     }
 
-    statusEl.textContent = summary.active ? "Scanner active" : "Scanner idle";
-    scannedEl.textContent = String(summary.scannedCount || 0);
-    harmfulEl.textContent = String(summary.harmfulCount || 0);
+    chrome.tabs.sendMessage(activeTab.id, { type: "bps:get-summary" }, (summary) => {
+      if (chrome.runtime.lastError || !summary) {
+        showUnavailable("Unavailable on this page");
+        return;
+      }
+
+      statusEl.textContent = summary.active ? "Scanner active" : "Scanner idle";
+      scannedEl.textContent = String(summary.scannedCount || 0);
+      harmfulEl.textContent = String(summary.harmfulCount || 0);
+    });
   });
 }
 

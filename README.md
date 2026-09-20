@@ -2,8 +2,8 @@
 
 A minimal Chrome extension (Manifest V3) that scans the visible text on a
 webpage and checks it against a simple **local, keyword-based** harmful-language
-list. This first version only **reads and logs** — it does not blur, rewrite, or
-modify the page, and it uses **no AI, API, backend, or database**.
+list. Detected phrases are softly marked and provide local show-original and
+safer-version controls. The extension uses **no AI, API, backend, or database**.
 
 ---
 
@@ -13,7 +13,8 @@ modify the page, and it uses **no AI, API, backend, or database**.
 basic-protection-scanner/
 ├── manifest.json     # Extension config (MV3): permissions, popup, content scripts
 ├── detector.js       # The harmful-language detector (keyword list) — the swappable piece
-├── content.js        # Scans the page DOM, calls the detector, logs matches
+├── content.js        # Scans the page DOM, calls the detector, flags matches
+├── flagging.css      # Subtle styling for detected harmful phrases
 ├── popup.html        # Small popup UI markup + styles
 ├── popup.js          # Fills the popup with the latest scan numbers
 ├── test-page.html    # A sample page for testing detection
@@ -24,21 +25,29 @@ basic-protection-scanner/
 
 - **manifest.json** — Declares the extension as Manifest V3. Registers the
   content scripts (`detector.js` then `content.js`, in that order so the
-  detector is defined first), the popup, and the `storage` + `activeTab`
-  permissions.
-- **detector.js** — Holds the sample harmful terms (`idiot`, `stupid`,
+  detector is defined first), and the popup. The popup requests the current
+  tab's summary directly from
+  its content script, so summaries are not shared between tabs.
+- **detector.js** — Holds the sample harmful-language rules (`idiot`, `stupid`,
   `hate you`, `shut up`, ...) and the `detectHarmfulLanguage(text)` function.
-  Matching is **case-insensitive**. It returns `{ detected, matchedPhrase,
-  snippet }`. This is the single place you replace to move to an AI/API
-  classifier later. It exposes itself via `window.ProtectionScanner`.
+  Matching is **case-insensitive**, word-boundary-aware, and returns all
+  matches with phrase offsets, category, and severity. It exposes itself via
+  `window.ProtectionScanner`, so a future AI/API classifier can replace this
+  file without changing the DOM scanner.
 - **content.js** — Runs on every page. It selects paragraph-like elements
   (`p, span, div, li, article, section, h1–h6`), skips `script/style/noscript/
   input/textarea` and hidden elements, avoids re-scanning elements (via a
-  `data-bps-scanned` marker), reads each element's direct visible text, sends it
-  to the detector, logs matches to the console, and saves a summary for the
-  popup.
+  `data-bps-scanned` marker), reads each element's exact direct text, sends it
+  to the detector, adds a `data-bps-flag` marker around safely mappable
+  harmful phrases, adds local show-original and safer-version controls, logs
+  matches, and keeps a summary for the popup. It does not replace large
+  containers or use `innerHTML`.
+- **flagging.css** — Provides a subtle highlight and small controls for marked
+  phrases. The original text remains in the marker and can be shown again at
+  any time; the local safer version is a separate display state.
 - **popup.html / popup.js** — Show "Scanner active", the total text blocks
-  scanned, and the number of harmful matches (read from `chrome.storage.local`).
+  scanned, and the number of harmful matches by requesting the active tab's
+  content script. Restricted pages show an unavailable state.
 - **test-page.html** — A ready-made page with a mix of clean and harmful lines
   (and one hidden line that should be ignored) to demonstrate detection.
 
@@ -48,8 +57,9 @@ basic-protection-scanner/
 Webpage DOM
   → content.js scans visible text
   → detector.js checks text
-  → result object { detected, matchedPhrase, snippet }
-  → console log + popup summary
+  → result object { detected, originalText, matches, suggestedRewrite }
+  → phrase marker with local controls
+  → console log + current-tab popup summary
 ```
 
 ---
@@ -94,13 +104,13 @@ Webpage DOM
 
 ## What should be built next
 
-- **Swap the detector**: replace the keyword list in `detector.js` with an
-  AI/API classifier (keep the same `detectHarmfulLanguage` contract so nothing
-  else changes).
+- **Swap the detector**: replace the local keyword rules in `detector.js` with
+  an AI/API classifier later (keep the same `detectHarmfulLanguage` contract
+  so nothing else changes). The current extension makes no external requests.
 - **Rescan dynamic content**: use a `MutationObserver` to catch text added after
   load (infinite scroll, single-page apps).
-- **Per-tab counts**: track summaries per tab instead of one global summary.
-- **On-page action (V2)**: blur or replace harmful text, with a user toggle.
+- **More complete inline scanning**: use a text-node mapping to detect phrases
+  split across nested inline elements.
 - **Options page**: let users edit the word list and severity levels.
 - **Better matching**: word-boundary matching to reduce false positives (e.g.
   avoid matching inside unrelated words).

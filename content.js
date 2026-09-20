@@ -8,10 +8,12 @@
  *   Webpage DOM
  *     -> read visible text from paragraph-like elements
  *     -> hand each text block to detector.js
- *     -> collect a result object
- *     -> log matches to the console + save a summary for the popup
+ *     -> mark exact harmful phrases and add local user controls
+ *     -> log matches and keep a summary for the popup
  *
- * V1 RULE: We DO NOT modify, blur, or rewrite the page. We only READ and LOG.
+ * The original phrase remains recoverable inside its marker. The default view
+ * softly obscures it, while the user can reveal it or view a local prototype
+ * safer alternative.
  */
 
 // The kinds of elements we treat as "readable content".
@@ -25,8 +27,8 @@ const READABLE_SELECTORS = [
   "h1", "h2", "h3", "h4", "h5", "h6"
 ];
 
-// We tag scanned elements with this attribute so we never scan them twice.
 const SCANNED_ATTR = "data-bps-scanned";
+const FLAG_ATTR = "data-bps-flag";
 
 /**
  * Decide whether an element is worth scanning.
@@ -64,21 +66,226 @@ function isScannableElement(el) {
 }
 
 /**
- * Get the DIRECT visible text of an element (not counting nested children's
- * text), so a big <div> wrapping many <p> tags does not double-report text.
- * We read only the element's own direct text nodes.
+ * Get the element's direct text and the source nodes used to build it. Keeping
+ * exact text (rather than trimming/collapsing whitespace) makes detector
+ * offsets safe to map back to DOM text nodes.
  *
  * @param {Element} el
- * @returns {string}
+ * @returns {{ text: string, textNodes: Text[] }}
  */
 function getDirectText(el) {
   let text = "";
+  const textNodes = [];
   for (const node of el.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       text += node.textContent;
+      textNodes.push(node);
     }
   }
-  return text.replace(/\s+/g, " ").trim();
+  return { text, textNodes };
+}
+
+function getSaferVersion(match) {
+  if (match.category === "insult") {
+    return "unkind language";
+  }
+
+  if (match.category === "hostile language") {
+    return "a more respectful response";
+  }
+
+  if (match.category === "profanity") {
+    return "inappropriate language";
+  }
+
+  if (match.category === "harassment/threat") {
+    return "a non-threatening statement";
+  }
+
+  return "a more constructive phrase";
+}
+
+function setFlagState(marker, state) {
+  const original = marker.querySelector("[data-bps-original]");
+  const safer = marker.querySelector("[data-bps-safer]");
+  const showOriginalButton = marker.querySelector("[data-bps-action='original']");
+  const saferButton = marker.querySelector("[data-bps-action='safer']");
+
+  marker.dataset.bpsState = state;
+  original.hidden = state === "safer";
+  safer.hidden = state !== "safer";
+  marker.classList.toggle("bps-is-revealed", state === "original");
+  marker.classList.toggle("bps-is-safer", state === "safer");
+  showOriginalButton.textContent = state === "original" ? "Hide original" : "Show original";
+  showOriginalButton.setAttribute("aria-pressed", String(state === "original"));
+  saferButton.setAttribute("aria-pressed", String(state === "safer"));
+}
+
+function addFlagControls(marker, match, originalNode) {
+  const original = document.createElement("span");
+  original.className = "bps-flag-content";
+  original.setAttribute("data-bps-original", "true");
+  // Moving the extracted node into this span replaces its original DOM
+  // position; creating a second text node here would duplicate the phrase.
+  original.appendChild(originalNode);
+
+  const safer = document.createElement("span");
+  safer.className = "bps-flag-content";
+  safer.setAttribute("data-bps-safer", "true");
+  safer.textContent = getSaferVersion(match);
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "bps-flag-trigger";
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-label", "Review potentially harmful phrase");
+  const triggerIcon = document.createElement("span");
+  triggerIcon.className = "bps-flag-icon";
+  triggerIcon.setAttribute("aria-hidden", "true");
+  triggerIcon.textContent = "!";
+  const triggerLabel = document.createElement("span");
+  triggerLabel.className = "bps-flag-trigger-label";
+  triggerLabel.textContent = "Potentially harmful";
+  trigger.append(triggerIcon, triggerLabel);
+
+  const panel = document.createElement("span");
+  panel.className = "bps-flag-panel";
+  panel.setAttribute("role", "group");
+  panel.setAttribute("aria-label", "Harmful phrase details");
+  panel.hidden = true;
+  const panelId = "bps-flag-panel-" + Math.random().toString(36).slice(2);
+  panel.id = panelId;
+  trigger.setAttribute("aria-controls", panelId);
+
+  const summary = document.createElement("span");
+  summary.className = "bps-flag-summary";
+  summary.textContent = match.category + " · " + match.severity + " severity";
+
+  const description = document.createElement("span");
+  description.className = "bps-flag-description";
+  description.textContent = "The original phrase is hidden. Choose how to view it.";
+
+  const originalDetail = document.createElement("span");
+  originalDetail.className = "bps-flag-detail";
+  originalDetail.textContent = "Original: " + match.phrase;
+
+  const saferDetail = document.createElement("span");
+  saferDetail.className = "bps-flag-detail bps-flag-detail-safe";
+  saferDetail.textContent = "Safer alternative: " + getSaferVersion(match);
+
+  const controls = document.createElement("span");
+  controls.className = "bps-flag-actions";
+
+  const showOriginalButton = document.createElement("button");
+  showOriginalButton.type = "button";
+  showOriginalButton.className = "bps-flag-button";
+  showOriginalButton.setAttribute("data-bps-action", "original");
+  showOriginalButton.setAttribute("aria-pressed", "false");
+  showOriginalButton.textContent = "Show original";
+
+  const saferButton = document.createElement("button");
+  saferButton.type = "button";
+  saferButton.className = "bps-flag-button";
+  saferButton.setAttribute("data-bps-action", "safer");
+  saferButton.setAttribute("aria-pressed", "false");
+  saferButton.textContent = "Safer version";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "bps-flag-close";
+  closeButton.setAttribute("data-bps-action", "close");
+  closeButton.setAttribute("aria-label", "Close harmful phrase details");
+  closeButton.textContent = "×";
+
+  controls.append(showOriginalButton, saferButton, closeButton);
+  panel.append(summary, description, originalDetail, saferDetail, controls);
+  marker.replaceChildren(original, safer, trigger, panel);
+  trigger.addEventListener("click", () => {
+    const isOpen = !panel.hidden;
+    panel.hidden = isOpen;
+    trigger.setAttribute("aria-expanded", String(!isOpen));
+    marker.dataset.bpsPanel = isOpen ? "closed" : "open";
+    if (isOpen) trigger.focus();
+  });
+  showOriginalButton.addEventListener("click", () => {
+    setFlagState(marker, marker.dataset.bpsState === "original" ? "hidden" : "original");
+  });
+  saferButton.addEventListener("click", () => {
+    setFlagState(marker, marker.dataset.bpsState === "safer" ? "hidden" : "safer");
+  });
+  closeButton.addEventListener("click", () => {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    marker.dataset.bpsPanel = "closed";
+    trigger.focus();
+  });
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      marker.dataset.bpsPanel = "closed";
+      trigger.focus();
+    }
+  });
+  marker.dataset.bpsPanel = "closed";
+  setFlagState(marker, "hidden");
+}
+
+/**
+ * Add a marker around one match without replacing the containing element.
+ * Matches spanning nested elements are deliberately skipped because wrapping
+ * them could move or break unrelated markup and event-listener boundaries.
+ */
+function flagMatch(textNodes, match) {
+  let offset = 0;
+
+  for (const textNode of textNodes) {
+    const nodeStart = offset;
+    const nodeEnd = offset + textNode.nodeValue.length;
+    offset = nodeEnd;
+
+    if (match.startIndex < nodeStart || match.endIndex > nodeEnd) {
+      continue;
+    }
+
+    const localStart = match.startIndex - nodeStart;
+    const localLength = match.endIndex - match.startIndex;
+    const matchNode = textNode.splitText(localStart);
+    const trailingNode = matchNode.splitText(localLength);
+    const marker = document.createElement("mark");
+
+    marker.className = "bps-harmful-phrase";
+    marker.setAttribute(FLAG_ATTR, "true");
+    marker.dataset.bpsPhrase = match.phrase;
+    marker.dataset.bpsOriginalText = matchNode.nodeValue;
+    marker.dataset.bpsCategory = match.category;
+    marker.dataset.bpsSeverity = match.severity;
+    marker.dataset.bpsStartIndex = String(match.startIndex);
+    marker.dataset.bpsEndIndex = String(match.endIndex);
+    marker.setAttribute("role", "group");
+    marker.setAttribute("aria-label", "Potentially harmful " + match.category);
+    addFlagControls(marker, match, matchNode);
+    trailingNode.parentNode.insertBefore(marker, trailingNode);
+    return true;
+  }
+
+  return false;
+}
+
+function flagMatches(textNodes, matches) {
+  // Apply right-to-left so offsets remain valid after text nodes split.
+  const sortedMatches = matches
+    .slice()
+    .sort((left, right) => right.startIndex - left.startIndex);
+
+  let lastStart = Infinity;
+  sortedMatches.forEach((match) => {
+    // Overlapping matches cannot be represented by nested markers safely.
+    if (match.endIndex > lastStart) return;
+    if (flagMatch(textNodes, match)) {
+      lastStart = match.startIndex;
+    }
+  });
 }
 
 /**
@@ -103,27 +310,34 @@ function scanPage() {
     // Mark as scanned so re-runs (e.g. dynamic content) skip it.
     el.setAttribute(SCANNED_ATTR, "true");
 
-    const text = getDirectText(el);
+    const directText = getDirectText(el);
+    const text = directText.text;
     if (!text) return; // nothing readable here
 
     scannedCount++;
 
     const result = detect(text);
     if (result.detected) {
-      matches.push({
-        tag: el.tagName.toLowerCase(),
-        matchedPhrase: result.matchedPhrase,
-        snippet: result.snippet
-      });
+      flagMatches(directText.textNodes, result.matches);
 
-      // Log each match clearly in the browser console.
-      console.log("[Basic Protection Scanner]");
-      console.log("Harmful language detected:");
-      console.log("  Element: <" + el.tagName.toLowerCase() + ">");
-      console.log("  Matched phrase: \u201c" + result.matchedPhrase + "\u201d");
-      console.log("  Text: \u201c" + result.snippet + "\u201d");
-      // Also log the actual DOM element so it can be inspected/clicked.
-      console.log("  DOM element:", el);
+      result.matches.forEach((match) => {
+        matches.push({
+          tag: el.tagName.toLowerCase(),
+          ...match,
+          snippet: result.originalText
+        });
+
+        // Log each match clearly in the browser console.
+        console.log("[Basic Protection Scanner]");
+        console.log("Harmful language detected:");
+        console.log("  Element: <" + el.tagName.toLowerCase() + ">");
+        console.log("  Matched phrase: \u201c" + match.phrase + "\u201d");
+        console.log("  Category: " + match.category);
+        console.log("  Severity: " + match.severity);
+        console.log("  Text: \u201c" + result.originalText + "\u201d");
+        // Also log the actual DOM element so it can be inspected/clicked.
+        console.log("  DOM element:", el);
+      });
     }
   });
 
@@ -131,36 +345,36 @@ function scanPage() {
 }
 
 /**
- * Save the latest summary so the popup can read it.
- * We use chrome.storage.local keyed by tab-independent totals for simplicity.
+ * Keep the summary in this tab's content-script context. The popup requests
+ * this value directly, so another tab cannot overwrite what it displays.
  */
-function saveSummary(summary) {
-  const payload = {
-    active: true,
-    scannedCount: summary.scannedCount,
-    harmfulCount: summary.matches.length,
-    updatedAt: Date.now()
-  };
+let latestSummary = null;
 
-  try {
-    chrome.storage.local.set({ bpsSummary: payload });
-  } catch (e) {
-    // Storage can fail on some restricted pages; that's OK for V1.
-    console.warn("[Basic Protection Scanner] Could not save summary:", e);
-  }
-}
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "bps:get-summary") return;
+
+  sendResponse({
+    active: true,
+    scannedCount: latestSummary ? latestSummary.scannedCount : 0,
+    harmfulCount: latestSummary ? latestSummary.matches.length : 0,
+    updatedAt: latestSummary ? latestSummary.updatedAt : null
+  });
+});
 
 /**
  * Run one full scan and report totals.
  */
 function runScan() {
   const summary = scanPage();
+  latestSummary = {
+    ...summary,
+    updatedAt: Date.now()
+  };
 
   console.log("[Basic Protection Scanner]");
   console.log("Scanned elements: " + summary.scannedCount);
   console.log("Harmful matches: " + summary.matches.length);
 
-  saveSummary(summary);
 }
 
 // Run the first scan once the page has settled.
