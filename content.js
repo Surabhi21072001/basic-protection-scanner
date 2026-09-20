@@ -134,11 +134,47 @@ function addFlagControls(marker, match, originalNode) {
   safer.setAttribute("data-bps-safer", "true");
   safer.textContent = getSaferVersion(match);
 
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "bps-flag-trigger";
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-label", "Review potentially harmful phrase");
+  const triggerIcon = document.createElement("span");
+  triggerIcon.className = "bps-flag-icon";
+  triggerIcon.setAttribute("aria-hidden", "true");
+  triggerIcon.textContent = "!";
+  const triggerLabel = document.createElement("span");
+  triggerLabel.className = "bps-flag-trigger-label";
+  triggerLabel.textContent = "Potentially harmful";
+  trigger.append(triggerIcon, triggerLabel);
+
+  const panel = document.createElement("span");
+  panel.className = "bps-flag-panel";
+  panel.setAttribute("role", "group");
+  panel.setAttribute("aria-label", "Harmful phrase details");
+  panel.hidden = true;
+  const panelId = "bps-flag-panel-" + Math.random().toString(36).slice(2);
+  panel.id = panelId;
+  trigger.setAttribute("aria-controls", panelId);
+
+  const summary = document.createElement("span");
+  summary.className = "bps-flag-summary";
+  summary.textContent = match.category + " · " + match.severity + " severity";
+
+  const description = document.createElement("span");
+  description.className = "bps-flag-description";
+  description.textContent = "The original phrase is hidden. Choose how to view it.";
+
+  const originalDetail = document.createElement("span");
+  originalDetail.className = "bps-flag-detail";
+  originalDetail.textContent = "Original: " + match.phrase;
+
+  const saferDetail = document.createElement("span");
+  saferDetail.className = "bps-flag-detail bps-flag-detail-safe";
+  saferDetail.textContent = "Safer alternative: " + getSaferVersion(match);
+
   const controls = document.createElement("span");
-  controls.className = "bps-flag-controls";
-  controls.setAttribute("data-bps-controls", "true");
-  controls.setAttribute("role", "group");
-  controls.setAttribute("aria-label", "Harmful phrase controls");
+  controls.className = "bps-flag-actions";
 
   const showOriginalButton = document.createElement("button");
   showOriginalButton.type = "button";
@@ -146,9 +182,6 @@ function addFlagControls(marker, match, originalNode) {
   showOriginalButton.setAttribute("data-bps-action", "original");
   showOriginalButton.setAttribute("aria-pressed", "false");
   showOriginalButton.textContent = "Show original";
-  showOriginalButton.addEventListener("click", () => {
-    setFlagState(marker, marker.dataset.bpsState === "original" ? "hidden" : "original");
-  });
 
   const saferButton = document.createElement("button");
   saferButton.type = "button";
@@ -156,12 +189,45 @@ function addFlagControls(marker, match, originalNode) {
   saferButton.setAttribute("data-bps-action", "safer");
   saferButton.setAttribute("aria-pressed", "false");
   saferButton.textContent = "Safer version";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "bps-flag-close";
+  closeButton.setAttribute("data-bps-action", "close");
+  closeButton.setAttribute("aria-label", "Close harmful phrase details");
+  closeButton.textContent = "×";
+
+  controls.append(showOriginalButton, saferButton, closeButton);
+  panel.append(summary, description, originalDetail, saferDetail, controls);
+  marker.replaceChildren(original, safer, trigger, panel);
+  trigger.addEventListener("click", () => {
+    const isOpen = !panel.hidden;
+    panel.hidden = isOpen;
+    trigger.setAttribute("aria-expanded", String(!isOpen));
+    marker.dataset.bpsPanel = isOpen ? "closed" : "open";
+    if (isOpen) trigger.focus();
+  });
+  showOriginalButton.addEventListener("click", () => {
+    setFlagState(marker, marker.dataset.bpsState === "original" ? "hidden" : "original");
+  });
   saferButton.addEventListener("click", () => {
     setFlagState(marker, marker.dataset.bpsState === "safer" ? "hidden" : "safer");
   });
-
-  controls.append(showOriginalButton, saferButton);
-  marker.replaceChildren(original, safer, controls);
+  closeButton.addEventListener("click", () => {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    marker.dataset.bpsPanel = "closed";
+    trigger.focus();
+  });
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      marker.dataset.bpsPanel = "closed";
+      trigger.focus();
+    }
+  });
+  marker.dataset.bpsPanel = "closed";
   setFlagState(marker, "hidden");
 }
 
