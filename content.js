@@ -27,7 +27,6 @@ const READABLE_SELECTORS = [
   "h1", "h2", "h3", "h4", "h5", "h6"
 ];
 
-// We tag scanned elements with this attribute so we never scan them twice.
 const SCANNED_ATTR = "data-bps-scanned";
 const FLAG_ATTR = "data-bps-flag";
 
