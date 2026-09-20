@@ -58,10 +58,17 @@ function showEmptyState() {
 
 function showCleanState() {
   resultTitle.textContent = "No potentially harmful language detected";
-  resultBadge.textContent = "Looks constructive";
+  resultBadge.textContent = "No phrases flagged";
   resultBadge.className = "result-badge result-badge-safe";
   resultPlaceholder.hidden = false;
-  resultPlaceholder.querySelector("p").textContent = "No flagged phrases were found in this message.";
+  resultPlaceholder.replaceChildren();
+  const indicator = document.createElement("span");
+  indicator.className = "result-positive-indicator";
+  indicator.setAttribute("aria-hidden", "true");
+  indicator.textContent = "✓";
+  const message = document.createElement("p");
+  message.textContent = "No potentially harmful language was detected in this message.";
+  resultPlaceholder.append(indicator, message);
   resultPreview.hidden = true;
 }
 
@@ -76,9 +83,22 @@ function showDetectedState(text, detectionResult) {
   resultDetail.replaceChildren();
 
   detectionResult.matches.forEach((match) => {
-    const detail = document.createElement("span");
-    detail.className = "detail-chip detail-chip-amber";
-    detail.textContent = match.phrase + " · " + match.category + " · " + match.severity;
+    const detail = document.createElement("article");
+    detail.className = "result-match-card";
+
+    const phrase = document.createElement("strong");
+    phrase.className = "result-match-phrase";
+    phrase.textContent = match.phrase;
+
+    const metadata = document.createElement("span");
+    metadata.className = "result-match-metadata";
+    metadata.textContent = match.category + " · " + match.severity + " severity";
+
+    const alternative = document.createElement("span");
+    alternative.className = "result-match-alternative";
+    alternative.textContent = "Safer alternative: " + getDemoAlternative(match);
+
+    detail.append(phrase, metadata, alternative);
     resultDetail.appendChild(detail);
   });
 
@@ -86,6 +106,12 @@ function showDetectedState(text, detectionResult) {
   note.className = "detail-note";
   note.textContent = "Surrounding context remains readable.";
   resultDetail.appendChild(note);
+}
+
+function getDemoAlternative(match) {
+  if (match.category === "insult") return "a more constructive phrase";
+  if (match.category === "hostile language") return "a more respectful response";
+  return "a calmer way to express this";
 }
 
 function analyzeText() {

@@ -586,6 +586,19 @@ h3 {
   width: 44px;
 }
 
+.result-positive-indicator {
+  align-items: center;
+  background: var(--color-green-soft);
+  border-radius: 50%;
+  color: var(--color-green);
+  display: flex;
+  font-weight: 800;
+  height: 44px;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+  width: 44px;
+}
+
 .result-text {
   background: var(--color-surface-muted);
   border-radius: var(--radius-md);
@@ -603,11 +616,37 @@ h3 {
 }
 
 .result-detail {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--space-2);
   margin-bottom: var(--space-5);
+}
+
+.result-match-card {
+  background: var(--color-amber-soft);
+  border: 1px solid #f0d58f;
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-3);
+}
+
+.result-match-phrase {
+  color: var(--color-amber);
+  font-size: var(--text-sm);
+}
+
+.result-match-metadata,
+.result-match-alternative {
+  font-size: var(--text-xs);
+}
+
+.result-match-metadata {
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}
+
+.result-match-alternative {
+  color: var(--color-green);
 }
 
 .detail-chip-amber {
@@ -628,6 +667,13 @@ h3 {
 
 .principle-card {
   padding: var(--space-5);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.principle-card:hover,
+.principle-card:focus-within {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .step-number {
@@ -795,5 +841,10 @@ h3 {
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
+  }
+
+  .principle-card:hover,
+  .principle-card:focus-within {
+    transform: none;
   }
 }
