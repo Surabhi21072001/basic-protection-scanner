@@ -121,11 +121,13 @@ function setFlagState(marker, state) {
   saferButton.setAttribute("aria-pressed", String(state === "safer"));
 }
 
-function addFlagControls(marker, match) {
+function addFlagControls(marker, match, originalNode) {
   const original = document.createElement("span");
   original.className = "bps-flag-content";
   original.setAttribute("data-bps-original", "true");
-  original.textContent = marker.dataset.bpsOriginalText;
+  // Moving the extracted node into this span replaces its original DOM
+  // position; creating a second text node here would duplicate the phrase.
+  original.appendChild(originalNode);
 
   const safer = document.createElement("span");
   safer.className = "bps-flag-content";
@@ -196,7 +198,7 @@ function flagMatch(textNodes, match) {
     marker.dataset.bpsEndIndex = String(match.endIndex);
     marker.setAttribute("role", "group");
     marker.setAttribute("aria-label", "Potentially harmful " + match.category);
-    addFlagControls(marker, match);
+    addFlagControls(marker, match, matchNode);
     trailingNode.parentNode.insertBefore(marker, trailingNode);
     return true;
   }
