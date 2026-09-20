@@ -4,11 +4,6 @@
   "version": "1.0.0",
   "description": "Version 1 prototype: scans visible webpage text and detects harmful language using a simple local keyword list.",
 
-  "permissions": [
-    "storage",
-    "activeTab"
-  ],
-
   "action": {
     "default_title": "Basic Protection Scanner",
     "default_popup": "popup.html"

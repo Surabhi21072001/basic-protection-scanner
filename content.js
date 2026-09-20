@@ -8,11 +8,12 @@
  *   Webpage DOM
  *     -> read visible text from paragraph-like elements
  *     -> hand each text block to detector.js
- *     -> mark exact harmful phrases without replacing page containers
- *     -> log matches to the console + save a summary for the popup
+ *     -> mark exact harmful phrases and add local user controls
+ *     -> log matches and keep a summary for the popup
  *
- * V1 RULE: We do not replace, blur, or rewrite page content. We only add
- * lightweight metadata and a subtle visual marker around exact matches.
+ * The original phrase remains recoverable inside its marker. The default view
+ * softly obscures it, while the user can reveal it or view a local prototype
+ * safer alternative.
  */
 
 // The kinds of elements we treat as "readable content".
@@ -279,36 +280,36 @@ function scanPage() {
 }
 
 /**
- * Save the latest summary so the popup can read it.
- * We use chrome.storage.local keyed by tab-independent totals for simplicity.
+ * Keep the summary in this tab's content-script context. The popup requests
+ * this value directly, so another tab cannot overwrite what it displays.
  */
-function saveSummary(summary) {
-  const payload = {
-    active: true,
-    scannedCount: summary.scannedCount,
-    harmfulCount: summary.matches.length,
-    updatedAt: Date.now()
-  };
+let latestSummary = null;
 
-  try {
-    chrome.storage.local.set({ bpsSummary: payload });
-  } catch (e) {
-    // Storage can fail on some restricted pages; that's OK for V1.
-    console.warn("[Basic Protection Scanner] Could not save summary:", e);
-  }
-}
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "bps:get-summary") return;
+
+  sendResponse({
+    active: true,
+    scannedCount: latestSummary ? latestSummary.scannedCount : 0,
+    harmfulCount: latestSummary ? latestSummary.matches.length : 0,
+    updatedAt: latestSummary ? latestSummary.updatedAt : null
+  });
+});
 
 /**
  * Run one full scan and report totals.
  */
 function runScan() {
   const summary = scanPage();
+  latestSummary = {
+    ...summary,
+    updatedAt: Date.now()
+  };
 
   console.log("[Basic Protection Scanner]");
   console.log("Scanned elements: " + summary.scannedCount);
   console.log("Harmful matches: " + summary.matches.length);
 
-  saveSummary(summary);
 }
 
 // Run the first scan once the page has settled.
