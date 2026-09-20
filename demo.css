@@ -615,6 +615,12 @@ h3 {
   padding: 0 0.2rem;
 }
 
+.demo-flag-high {
+  background: #fff0ee;
+  border-bottom-color: #c96c63;
+  color: var(--color-red);
+}
+
 .result-detail {
   display: grid;
   gap: var(--space-2);
@@ -630,6 +636,11 @@ h3 {
   padding: var(--space-3);
 }
 
+.result-match-card[data-severity="high"] {
+  background: #fff0ee;
+  border-color: #e4aaa3;
+}
+
 .result-match-phrase {
   color: var(--color-amber);
   font-size: var(--text-sm);
@@ -643,6 +654,11 @@ h3 {
 .result-match-metadata {
   color: var(--color-text-muted);
   text-transform: capitalize;
+}
+
+.result-match-card[data-severity="high"] .result-match-phrase,
+.result-match-card[data-severity="high"] .result-match-metadata {
+  color: var(--color-red);
 }
 
 .result-match-alternative {

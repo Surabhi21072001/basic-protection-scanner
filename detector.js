@@ -10,6 +10,7 @@
 
 const HARMFUL_RULES = [
   { phrase: "hate you", category: "hostile language", severity: "medium" },
+  { phrase: "kill yourself", category: "self-harm encouragement", severity: "high" },
   { phrase: "shut up", category: "hostile language", severity: "low" },
   { phrase: "idiot", category: "insult", severity: "low" },
   { phrase: "stupid", category: "insult", severity: "low" },

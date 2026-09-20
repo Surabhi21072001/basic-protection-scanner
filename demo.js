@@ -33,7 +33,7 @@ function createHighlightedText(text, matches) {
     }
 
     const mark = document.createElement("mark");
-    mark.className = "demo-flag";
+    mark.className = "demo-flag demo-flag-" + match.severity;
     mark.textContent = text.slice(match.startIndex, match.endIndex);
     mark.title = match.category + " · " + match.severity + " severity";
     fragment.appendChild(mark);
@@ -51,8 +51,15 @@ function showEmptyState() {
   resultTitle.textContent = "Enter text to analyze";
   resultBadge.textContent = "Waiting for input";
   resultBadge.className = "result-badge result-badge-neutral";
+  resultPlaceholder.replaceChildren();
+  const icon = document.createElement("div");
+  icon.className = "result-placeholder-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "↗";
+  const message = document.createElement("p");
+  message.textContent = "Choose an example or enter text to see what the scanner notices.";
+  resultPlaceholder.append(icon, message);
   resultPlaceholder.hidden = false;
-  resultPlaceholder.querySelector("p").textContent = "Choose an example or enter text to see what the scanner notices.";
   resultPreview.hidden = true;
 }
 
@@ -85,6 +92,7 @@ function showDetectedState(text, detectionResult) {
   detectionResult.matches.forEach((match) => {
     const detail = document.createElement("article");
     detail.className = "result-match-card";
+    detail.dataset.severity = match.severity;
 
     const phrase = document.createElement("strong");
     phrase.className = "result-match-phrase";
@@ -96,7 +104,7 @@ function showDetectedState(text, detectionResult) {
 
     const alternative = document.createElement("span");
     alternative.className = "result-match-alternative";
-    alternative.textContent = "Safer alternative: " + getDemoAlternative(match);
+    alternative.textContent = "Prototype safer alternative: " + getDemoAlternative(match);
 
     detail.append(phrase, metadata, alternative);
     resultDetail.appendChild(detail);
@@ -128,8 +136,11 @@ function analyzeText() {
     resultTitle.textContent = "Analyzer unavailable";
     resultBadge.textContent = "Setup error";
     resultBadge.className = "result-badge result-badge-warning";
+    resultPlaceholder.replaceChildren();
+    const message = document.createElement("p");
+    message.textContent = "The local detector could not be loaded.";
+    resultPlaceholder.appendChild(message);
     resultPlaceholder.hidden = false;
-    resultPlaceholder.querySelector("p").textContent = "The local detector could not be loaded.";
     resultPreview.hidden = true;
     return;
   }

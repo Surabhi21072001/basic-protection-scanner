@@ -29,6 +29,7 @@ const READABLE_SELECTORS = [
 
 const SCANNED_ATTR = "data-bps-scanned";
 const FLAG_ATTR = "data-bps-flag";
+let nextFlagPanelId = 0;
 
 /**
  * Decide whether an element is worth scanning.
@@ -111,14 +112,22 @@ function setFlagState(marker, state) {
   const showOriginalButton = marker.querySelector("[data-bps-action='original']");
   const saferButton = marker.querySelector("[data-bps-action='safer']");
 
-  marker.dataset.bpsState = state;
+  marker.dataset.bpsDisplay = state;
   original.hidden = state === "safer";
   safer.hidden = state !== "safer";
-  marker.classList.toggle("bps-is-revealed", state === "original");
-  marker.classList.toggle("bps-is-safer", state === "safer");
   showOriginalButton.textContent = state === "original" ? "Hide original" : "Show original";
   showOriginalButton.setAttribute("aria-pressed", String(state === "original"));
   saferButton.setAttribute("aria-pressed", String(state === "safer"));
+}
+
+function setFlagOpen(marker, isOpen, restoreFocus = false) {
+  const trigger = marker.querySelector(".bps-flag-trigger");
+  const panel = marker.querySelector(".bps-flag-panel");
+
+  marker.dataset.bpsOpen = String(isOpen);
+  panel.hidden = !isOpen;
+  trigger.setAttribute("aria-expanded", String(isOpen));
+  if (!isOpen && restoreFocus) trigger.focus();
 }
 
 function addFlagControls(marker, match, originalNode) {
@@ -145,15 +154,15 @@ function addFlagControls(marker, match, originalNode) {
   triggerIcon.textContent = "!";
   const triggerLabel = document.createElement("span");
   triggerLabel.className = "bps-flag-trigger-label";
-  triggerLabel.textContent = "Potentially harmful";
+  triggerLabel.textContent = "Potentially harmful phrase";
   trigger.append(triggerIcon, triggerLabel);
 
   const panel = document.createElement("span");
   panel.className = "bps-flag-panel";
-  panel.setAttribute("role", "group");
+  panel.setAttribute("role", "region");
   panel.setAttribute("aria-label", "Harmful phrase details");
   panel.hidden = true;
-  const panelId = "bps-flag-panel-" + Math.random().toString(36).slice(2);
+  const panelId = "bps-flag-panel-" + nextFlagPanelId++;
   panel.id = panelId;
   trigger.setAttribute("aria-controls", panelId);
 
@@ -171,7 +180,7 @@ function addFlagControls(marker, match, originalNode) {
 
   const saferDetail = document.createElement("span");
   saferDetail.className = "bps-flag-detail bps-flag-detail-safe";
-  saferDetail.textContent = "Safer alternative: " + getSaferVersion(match);
+  saferDetail.textContent = "Prototype safer alternative: " + getSaferVersion(match);
 
   const controls = document.createElement("span");
   controls.className = "bps-flag-actions";
@@ -182,13 +191,15 @@ function addFlagControls(marker, match, originalNode) {
   showOriginalButton.setAttribute("data-bps-action", "original");
   showOriginalButton.setAttribute("aria-pressed", "false");
   showOriginalButton.textContent = "Show original";
+  showOriginalButton.setAttribute("aria-label", "Reveal or hide the original phrase");
 
   const saferButton = document.createElement("button");
   saferButton.type = "button";
   saferButton.className = "bps-flag-button";
   saferButton.setAttribute("data-bps-action", "safer");
   saferButton.setAttribute("aria-pressed", "false");
-  saferButton.textContent = "Safer version";
+  saferButton.textContent = "View safer alternative";
+  saferButton.setAttribute("aria-label", "View the prototype safer alternative");
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
@@ -201,34 +212,25 @@ function addFlagControls(marker, match, originalNode) {
   panel.append(summary, description, originalDetail, saferDetail, controls);
   marker.replaceChildren(original, safer, trigger, panel);
   trigger.addEventListener("click", () => {
-    const isOpen = !panel.hidden;
-    panel.hidden = isOpen;
-    trigger.setAttribute("aria-expanded", String(!isOpen));
-    marker.dataset.bpsPanel = isOpen ? "closed" : "open";
-    if (isOpen) trigger.focus();
+    setFlagOpen(marker, marker.dataset.bpsOpen !== "true");
   });
   showOriginalButton.addEventListener("click", () => {
-    setFlagState(marker, marker.dataset.bpsState === "original" ? "hidden" : "original");
+    setFlagState(marker, marker.dataset.bpsDisplay === "original" ? "protected" : "original");
   });
   saferButton.addEventListener("click", () => {
-    setFlagState(marker, marker.dataset.bpsState === "safer" ? "hidden" : "safer");
+    setFlagState(marker, marker.dataset.bpsDisplay === "safer" ? "protected" : "safer");
   });
   closeButton.addEventListener("click", () => {
-    panel.hidden = true;
-    trigger.setAttribute("aria-expanded", "false");
-    marker.dataset.bpsPanel = "closed";
-    trigger.focus();
+    setFlagOpen(marker, false, true);
   });
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      panel.hidden = true;
-      trigger.setAttribute("aria-expanded", "false");
-      marker.dataset.bpsPanel = "closed";
-      trigger.focus();
+      event.preventDefault();
+      setFlagOpen(marker, false, true);
     }
   });
-  marker.dataset.bpsPanel = "closed";
-  setFlagState(marker, "hidden");
+  marker.dataset.bpsOpen = "false";
+  setFlagState(marker, "protected");
 }
 
 /**
