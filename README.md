@@ -18,6 +18,8 @@ basic-protection-scanner/
 ├── popup.html        # Small popup UI markup + styles
 ├── popup.js          # Fills the popup with the latest scan numbers
 ├── test-page.html    # A sample page for testing detection
+├── tests/
+│   └── detector.test.js # Dependency-free detector regression tests
 └── README.md         # This file
 ```
 
@@ -29,19 +31,22 @@ basic-protection-scanner/
   tab's summary directly from
   its content script, so summaries are not shared between tabs.
 - **detector.js** — Holds the sample harmful-language rules (`idiot`, `stupid`,
-  `hate you`, `shut up`, ...) and the `detectHarmfulLanguage(text)` function.
-  Matching is **case-insensitive**, word-boundary-aware, and returns all
-  matches with phrase offsets, category, and severity. It exposes itself via
-  `window.ProtectionScanner`, so a future AI/API classifier can replace this
-  file without changing the DOM scanner.
+  `piece of shit`, `fuck`, `shit`, `hate you`, `shut up`, direct threats, and
+  `kill yourself`) and the `detectHarmfulLanguage(text)` function. Matching is
+  **case-insensitive**, Unicode word-boundary-aware, and returns non-overlapping
+  matches with phrase offsets, category, and severity. Overlaps prefer the
+  leftmost match and then the longest match at that start. It exposes itself
+  via `window.ProtectionScanner`, so a future classifier can replace this file
+  without changing the DOM scanner.
 - **content.js** — Runs on every page. It selects paragraph-like elements
   (`p, span, div, li, article, section, h1–h6`), skips `script/style/noscript/
   input/textarea` and hidden elements, avoids re-scanning elements (via a
   `data-bps-scanned` marker), reads each element's exact direct text, sends it
   to the detector, adds a `data-bps-flag` marker around safely mappable
-  harmful phrases, adds local show-original and safer-version controls, logs
-  matches, and keeps a summary for the popup. It does not replace large
-  containers or use `innerHTML`.
+  harmful phrases, adds local show-original and safer-version controls, and
+  keeps an aggregate summary for the popup. Normal execution does not log
+  page text or DOM elements. It does not replace large containers or use
+  `innerHTML`.
 - **flagging.css** — Provides a subtle highlight and small controls for marked
   phrases. The original text remains in the marker and can be shown again at
   any time; the local safer version is a separate display state.
@@ -59,7 +64,7 @@ Webpage DOM
   → detector.js checks text
   → result object { detected, originalText, matches, suggestedRewrite }
   → phrase marker with local controls
-  → console log + current-tab popup summary
+  → current-tab popup summary (aggregate counts only)
 ```
 
 ---
@@ -74,31 +79,30 @@ Webpage DOM
 
 ## How to test it
 
+Run the detector regression suite from the repository root with Node.js:
+
+```sh
+node --test tests/detector.test.js
+```
+
+The suite checks rule classifications, multiple-match offsets, case-insensitive
+matching, Unicode word boundaries, and overlap precedence. It also documents
+current rule-based limitations: negation, quoted phrases, and reported speech
+do not change whether a phrase matches. These are expected prototype
+behaviors, not contextual NLP tests.
+
 1. Open the included `test-page.html` in Chrome. The easiest way:
    - Drag `test-page.html` into a Chrome tab, **or**
    - Right-click the file → Open With → Chrome.
    > Note: To let the extension run on local `file://` pages, open
    > `chrome://extensions`, click **Details** on the extension, and enable
    > **Allow access to file URLs**. Otherwise just test on any normal website.
-2. Open DevTools (`Cmd+Option+I` on macOS / `F12`) and click the **Console** tab.
-3. You should see output like:
-
-   ```
-   [Basic Protection Scanner]
-   Harmful language detected:
-     Element: <p>
-     Matched phrase: “idiot”
-     Text: “You are such an idiot.”
-   ...
-   [Basic Protection Scanner]
-   Scanned elements: 7
-   Harmful matches: 4
-   ```
-
-4. Click the extension icon to open the **popup**. It shows:
+2. Click the extension icon to open the **popup**. It shows:
    - "Scanner active"
    - Text blocks scanned
    - Harmful matches found
+3. Normal execution does not print matched page text or DOM elements to the
+   console. A warning is shown if the detector script is unavailable.
 
 ---
 

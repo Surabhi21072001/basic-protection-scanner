@@ -9,13 +9,18 @@
  */
 
 const HARMFUL_RULES = [
-  { phrase: "hate you", category: "hostile language", severity: "medium" },
-  { phrase: "kill yourself", category: "self-harm encouragement", severity: "high" },
-  { phrase: "shut up", category: "hostile language", severity: "low" },
   { phrase: "idiot", category: "insult", severity: "low" },
   { phrase: "stupid", category: "insult", severity: "low" },
   { phrase: "moron", category: "insult", severity: "low" },
-  { phrase: "loser", category: "insult", severity: "low" }
+  { phrase: "loser", category: "insult", severity: "low" },
+  { phrase: "piece of shit", category: "insult", severity: "medium" },
+  { phrase: "fuck", category: "profanity", severity: "low" },
+  { phrase: "shit", category: "profanity", severity: "low" },
+  { phrase: "hate you", category: "hostile language", severity: "medium" },
+  { phrase: "shut up", category: "hostile language", severity: "low" },
+  { phrase: "I will hurt you", category: "threat", severity: "high" },
+  { phrase: "I will kill you", category: "threat", severity: "high" },
+  { phrase: "kill yourself", category: "self-harm encouragement", severity: "high" }
 ];
 
 function escapeRegExp(value) {
@@ -25,10 +30,10 @@ function escapeRegExp(value) {
 function createRulePattern(phrase) {
   // Capture the leading boundary so offsets refer to the original phrase.
   return new RegExp(
-    "(^|[^A-Za-z0-9_])" +
+    "(^|[^\\p{L}\\p{N}\\p{M}_])" +
       escapeRegExp(phrase).replace(/\s+/g, "\\s+") +
-      "(?=$|[^A-Za-z0-9_])",
-    "gi"
+      "(?=$|[^\\p{L}\\p{N}\\p{M}_])",
+    "giu"
   );
 }
 
@@ -51,7 +56,7 @@ function detectHarmfulLanguage(text) {
   const originalText = typeof text === "string" ? text : "";
   const matches = [];
 
-  for (const rule of HARMFUL_RULES) {
+  HARMFUL_RULES.forEach((rule, ruleOrder) => {
     const pattern = createRulePattern(rule.phrase);
     let match;
 
@@ -67,24 +72,30 @@ function detectHarmfulLanguage(text) {
         category: rule.category,
         severity: rule.severity,
         startIndex: phraseStart,
-        endIndex: phraseStart + phrase.length
+        endIndex: phraseStart + phrase.length,
+        ruleOrder
       });
 
       if (match[0].length === 0) {
         pattern.lastIndex += 1;
       }
     }
-  }
-
-  matches.sort((left, right) => left.startIndex - right.startIndex);
-
-  // Deduplicate identical source spans if rules are expanded later.
-  const uniqueMatches = matches.filter((match, index) => {
-    const previous = matches[index - 1];
-    return !previous ||
-      previous.startIndex !== match.startIndex ||
-      previous.endIndex !== match.endIndex;
   });
+
+  // Prefer the leftmost match, then the longest rule, then existing rule order.
+  matches.sort((left, right) =>
+    left.startIndex - right.startIndex ||
+    right.endIndex - left.endIndex ||
+    left.ruleOrder - right.ruleOrder
+  );
+
+  const uniqueMatches = [];
+  for (const match of matches) {
+    const previous = uniqueMatches[uniqueMatches.length - 1];
+    if (previous && match.startIndex < previous.endIndex) continue;
+    const { ruleOrder, ...publicMatch } = match;
+    uniqueMatches.push(publicMatch);
+  }
 
   return {
     detected: uniqueMatches.length > 0,

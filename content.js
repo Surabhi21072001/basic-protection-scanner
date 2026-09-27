@@ -9,7 +9,7 @@
  *     -> read visible text from paragraph-like elements
  *     -> hand each text block to detector.js
  *     -> mark exact harmful phrases and add local user controls
- *     -> log matches and keep a summary for the popup
+ *     -> keep aggregate scan counts for the popup
  *
  * The original phrase remains recoverable inside its marker. The default view
  * softly obscures it, while the user can reveal it or view a local prototype
@@ -298,7 +298,7 @@ function scanPage() {
   const elements = document.querySelectorAll(READABLE_SELECTORS.join(","));
 
   let scannedCount = 0;
-  const matches = [];
+  let harmfulCount = 0;
 
   const detect = window.ProtectionScanner && window.ProtectionScanner.detectHarmfulLanguage;
   if (typeof detect !== "function") {
@@ -321,29 +321,11 @@ function scanPage() {
     const result = detect(text);
     if (result.detected) {
       flagMatches(directText.textNodes, result.matches);
-
-      result.matches.forEach((match) => {
-        matches.push({
-          tag: el.tagName.toLowerCase(),
-          ...match,
-          snippet: result.originalText
-        });
-
-        // Log each match clearly in the browser console.
-        console.log("[Basic Protection Scanner]");
-        console.log("Harmful language detected:");
-        console.log("  Element: <" + el.tagName.toLowerCase() + ">");
-        console.log("  Matched phrase: \u201c" + match.phrase + "\u201d");
-        console.log("  Category: " + match.category);
-        console.log("  Severity: " + match.severity);
-        console.log("  Text: \u201c" + result.originalText + "\u201d");
-        // Also log the actual DOM element so it can be inspected/clicked.
-        console.log("  DOM element:", el);
-      });
+      harmfulCount += result.matches.length;
     }
   });
 
-  return { scannedCount, matches };
+  return { scannedCount, harmfulCount };
 }
 
 /**
@@ -358,7 +340,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   sendResponse({
     active: true,
     scannedCount: latestSummary ? latestSummary.scannedCount : 0,
-    harmfulCount: latestSummary ? latestSummary.matches.length : 0,
+    harmfulCount: latestSummary ? latestSummary.harmfulCount : 0,
     updatedAt: latestSummary ? latestSummary.updatedAt : null
   });
 });
@@ -372,10 +354,6 @@ function runScan() {
     ...summary,
     updatedAt: Date.now()
   };
-
-  console.log("[Basic Protection Scanner]");
-  console.log("Scanned elements: " + summary.scannedCount);
-  console.log("Harmful matches: " + summary.matches.length);
 
 }
 
