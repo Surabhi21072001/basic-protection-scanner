@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Basic Protection Scanner | Sprint Review Prototype</title>
+  <title>Sensitive Content Detector | Sprint Review Prototype</title>
   <link rel="stylesheet" href="demo.css" />
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="#top" aria-label="Basic Protection Scanner home">
+    <a class="brand" href="#top" aria-label="Sensitive Content Detector home">
       <span class="brand-mark" aria-hidden="true">B</span>
-      <span>Basic Protection Scanner</span>
+      <span>Sensitive Content Detector</span>
     </a>
     <div class="header-meta">
       <span class="prototype-badge">Local prototype</span>
@@ -24,12 +24,12 @@
         <p class="eyebrow">COMMUNICATION SAFETY</p>
         <h1 id="hero-title">Protect users from harmful language without removing user agency.</h1>
         <p class="hero-summary">
-          Basic Protection Scanner helps people identify potentially harmful language,
+          Sensitive Content Detector helps people identify potentially harmful language,
           understand what was flagged, and choose what happens next.
         </p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#live-demo">Explore the live demo</a>
-          <a class="button button-secondary" href="#how-it-works">How it works</a>
+          <a class="button button-primary" href="#analyzer">Test a message</a>
+          <a class="button button-secondary" href="#live-demo">See browser protection</a>
         </div>
       </div>
 
@@ -84,6 +84,12 @@
         <h2 id="analyzer-title">Try a message before you send it</h2>
         <p>Try a sentence to see what the local prototype notices before you send it.</p>
       </div>
+      <ol class="guided-steps" aria-label="Analyzer steps">
+        <li data-guided-step="enter" aria-current="step"><span>1</span> Enter</li>
+        <li data-guided-step="analyze"><span>2</span> Analyze</li>
+        <li data-guided-step="review"><span>3</span> Review</li>
+        <li data-guided-step="choose"><span>4</span> Choose</li>
+      </ol>
       <div class="analyzer-layout">
         <form class="analyzer-form card" id="analyzer-form" novalidate>
           <label for="analyzer-input">Your message</label>
@@ -97,12 +103,21 @@
             <button class="button button-secondary" id="clear-button" type="button">Clear</button>
           </div>
           <div class="example-inputs">
-            <span class="example-label">Try an example</span>
+            <span class="example-label">Choose a scenario</span>
             <div class="example-buttons">
-              <button class="example-button" type="button" data-example="I disagree with your point, but I would like to understand it.">Friendly comment</button>
-              <button class="example-button" type="button" data-example="You are such an idiot.">Mild insult</button>
-              <button class="example-button" type="button" data-example="Shut up, nobody cares.">Hostile comment</button>
-              <button class="example-button" type="button" data-example="You are a moron and I hate you.">Multiple matches</button>
+              <button class="example-button example-button-recommended" type="button" data-example="You are such an idiot.">
+                <span>Recommended Demo</span> Direct insult
+              </button>
+              <button class="example-button" type="button" data-example="Thanks for explaining your idea.">
+                Friendly message
+              </button>
+              <button class="example-button" type="button" data-example="You are stupid and a moron.">
+                Multiple issues
+              </button>
+              <button class="example-button" type="button" data-example="You are an ｉｄｉｏｔ.">
+                Filter-evasion example
+                <small>Unicode-obfuscated phrase</small>
+              </button>
             </div>
           </div>
         </form>
@@ -126,6 +141,29 @@
           </div>
         </section>
       </div>
+      <section class="protection-preview card" id="protection-preview" aria-labelledby="protection-preview-title" hidden>
+        <div class="protection-preview-header">
+          <div>
+            <p class="eyebrow">SEE THE DIFFERENCE</p>
+            <h3 id="protection-preview-title">Protection Preview</h3>
+            <p>Compare your message before and after phrase-level protection.</p>
+          </div>
+          <div class="preview-toggle" role="group" aria-label="Protection preview mode">
+            <button class="preview-toggle-button" id="preview-without-button" type="button" aria-pressed="true">
+              Without protection
+            </button>
+            <button class="preview-toggle-button" id="preview-with-button" type="button" aria-pressed="false">
+              With protection
+            </button>
+          </div>
+        </div>
+        <div class="preview-message-panel" id="preview-without" aria-label="Message without protection"></div>
+        <div class="preview-message-panel" id="preview-with" aria-label="Message with protection" hidden></div>
+      </section>
+      <aside class="local-prototype-note" aria-label="Prototype limitations and privacy">
+        <strong>Local prototype</strong>
+        <span>Analysis runs in your browser; no text is sent to an external service. This rule-based prototype may not understand negation, quotation, reported speech, sarcasm, or intent.</span>
+      </aside>
     </section>
 
     <section class="page-shell section-block" id="how-it-works" aria-labelledby="principles-title">
@@ -156,9 +194,9 @@
     <section class="page-shell section-block" id="live-demo" aria-labelledby="demo-title">
       <div class="section-heading section-heading-row">
         <div>
-          <p class="eyebrow">LIVE WEBPAGE MODERATION DEMO</p>
+          <p class="eyebrow">BROWSER PROTECTION</p>
           <h2 id="demo-title">See protection in context</h2>
-          <p>Load this page with the extension to see flagged phrases and user controls in action.</p>
+          <p>See how the extension handles potentially harmful language while you browse.</p>
         </div>
         <span class="demo-status"><span class="status-dot" aria-hidden="true"></span> Scanner-ready page</span>
       </div>
@@ -166,22 +204,32 @@
       <article class="demo-article card">
         <div class="article-meta">
           <div class="article-author">
-            <span class="avatar avatar-indigo" aria-hidden="true">J</span>
+            <span class="avatar avatar-indigo" aria-hidden="true">C</span>
             <div>
-              <strong>Community conversation</strong>
-              <span>Example discussion · 2 min read</span>
+              <strong>Community discussion</strong>
+              <span>Workspace planning · public thread</span>
             </div>
           </div>
-          <span class="category-tag">Discussion</span>
+          <span class="category-tag">3 replies</span>
         </div>
         <div class="article-body">
-          <p class="article-lede">Online conversations can be thoughtful, direct, and respectful even when people disagree.</p>
-          <p>One participant shared a proposal for improving the community workspace and invited feedback from the group.</p>
-          <p class="comment comment-amber">You are such an idiot for suggesting that.</p>
-          <p class="comment comment-amber">Please do not tell people to shut up when they ask a question.</p>
-          <p class="comment comment-amber">Stop being a moron about it. I really hate you sometimes.</p>
-          <p class="comment comment-safe">Another participant offered a different perspective and explained their reasoning calmly.</p>
-          <p class="article-caption">Try the controls injected around flagged phrases. The surrounding context remains available throughout.</p>
+          <p class="article-lede">Alex Morgan <span class="thread-time">· 2 min ago</span></p>
+          <p>I think we should reconsider the timeline before releasing the community workspace update.</p>
+          <div class="thread-replies" aria-label="Discussion replies">
+            <div class="thread-reply">
+              <p class="thread-author"><strong>Jordan Lee</strong><span>1 min ago</span></p>
+              <p class="comment">You are such an idiot for suggesting that.</p>
+            </div>
+            <div class="thread-reply">
+              <p class="thread-author"><strong>Maya Chen</strong><span>just now</span></p>
+              <p class="comment">Thanks for sharing your concern. I disagree with the proposal, but the timing question is worth discussing.</p>
+            </div>
+            <div class="thread-reply">
+              <p class="thread-author"><strong>Jordan Lee</strong><span>just now</span></p>
+              <p class="comment">Please do not tell people to shut up when they ask a question.</p>
+            </div>
+          </div>
+          <p class="article-caption">The extension marks supported phrases in this thread. Use each flag to review the category and choose what to view.</p>
         </div>
       </article>
     </section>
@@ -193,7 +241,7 @@
 
   <footer class="site-footer">
     <div class="page-shell footer-inner">
-      <span>Basic Protection Scanner · Carnegie Mellon Agile Methods Sprint Review</span>
+      <span>Sensitive Content Detector · Carnegie Mellon Agile Methods Sprint Review</span>
       <span>Prototype v1</span>
     </div>
   </footer>

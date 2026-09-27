@@ -5,8 +5,8 @@
  * (see "matches": ["<all_urls>"] in manifest.json).
  *
  * WHAT IT DOES (the pipeline):
- *   Webpage DOM
- *     -> read visible text from paragraph-like elements
+ *   Webpage DOM (one initial scan)
+ *     -> read direct text from eligible visible elements
  *     -> hand each text block to detector.js
  *     -> mark exact harmful phrases and add local user controls
  *     -> keep aggregate scan counts for the popup
@@ -235,7 +235,7 @@ function addFlagControls(marker, match, originalNode) {
 
 /**
  * Add a marker around one match without replacing the containing element.
- * Matches spanning nested elements are deliberately skipped because wrapping
+ * Matches spanning multiple direct text nodes are skipped because wrapping
  * them could move or break unrelated markup and event-listener boundaries.
  */
 function flagMatch(textNodes, match) {
@@ -291,7 +291,7 @@ function flagMatches(textNodes, matches) {
 }
 
 /**
- * Scan the whole document once.
+ * Scan eligible elements in the document once.
  * Returns a summary object: { scannedCount, matches: [...] }
  */
 function scanPage() {
@@ -302,14 +302,14 @@ function scanPage() {
 
   const detect = window.ProtectionScanner && window.ProtectionScanner.detectHarmfulLanguage;
   if (typeof detect !== "function") {
-    console.warn("[Basic Protection Scanner] detector.js not loaded — skipping scan.");
+    console.warn("[Sensitive Content Detector] detector.js not loaded — skipping scan.");
     return { scannedCount: 0, matches: [] };
   }
 
   elements.forEach((el) => {
     if (!isScannableElement(el)) return;
 
-    // Mark as scanned so re-runs (e.g. dynamic content) skip it.
+    // Avoid processing the same element again if this scan is invoked later.
     el.setAttribute(SCANNED_ATTR, "true");
 
     const directText = getDirectText(el);

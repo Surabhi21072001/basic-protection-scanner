@@ -9,12 +9,18 @@ const detectorSource = fs.readFileSync(
   "utf8"
 );
 const detectorWindow = {};
+const detectorContext = vm.createContext({ window: detectorWindow });
 
-vm.runInNewContext(detectorSource, { window: detectorWindow });
+vm.runInContext(detectorSource, detectorContext);
 
 const detectHarmfulLanguage =
   detectorWindow.ProtectionScanner.detectHarmfulLanguage;
 const harmfulRules = detectorWindow.ProtectionScanner.HARMFUL_RULES;
+const normalizeForMatching = vm.runInContext("normalizeForMatching", detectorContext);
+const mapNormalizedSpanToOriginal = vm.runInContext(
+  "mapNormalizedSpanToOriginal",
+  detectorContext
+);
 
 function normalize(value) {
   return JSON.parse(JSON.stringify(value));
@@ -237,6 +243,99 @@ test("Unicode letters and combining marks are treated as word characters", () =>
 
   assert.equal(result.detected, false);
   assert.equal(result.matches.length, 0);
+});
+
+test("fullwidth ASCII phrase is detected with original source text and offsets", () => {
+  const text = "ｉｄｉｏｔ";
+  const result = detectHarmfulLanguage(text);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].category, "insult");
+  assert.equal(result.matches[0].phrase, text);
+  assert.equal(result.matches[0].startIndex, 0);
+  assert.equal(result.matches[0].endIndex, text.length);
+  assertMatchOffsets(text, result.matches);
+});
+
+test("fullwidth rule does not match inside a longer normalized word", () => {
+  const text = "ｉｄｉｏｔｉｃ";
+  const result = detectHarmfulLanguage(text);
+
+  assert.equal(result.detected, false);
+  assert.equal(result.matches.length, 0);
+});
+
+test("approved invisible characters are ignored during matching and included in source spans", () => {
+  for (const invisible of ["\u200B", "\u2060", "\uFEFF"]) {
+    const text = `f${invisible}uck`;
+    const result = detectHarmfulLanguage(text);
+
+    assert.equal(result.matches.length, 1);
+    assert.equal(result.matches[0].category, "profanity");
+    assert.equal(result.matches[0].phrase, text);
+    assert.equal(result.matches[0].startIndex, 0);
+    assert.equal(result.matches[0].endIndex, text.length);
+    assertMatchOffsets(text, result.matches);
+  }
+});
+
+test("approved invisible removal does not join letters inside a longer word", () => {
+  const text = "shi\u200Btake";
+  const result = detectHarmfulLanguage(text);
+
+  assert.equal(result.detected, false);
+  assert.equal(result.matches.length, 0);
+});
+
+test("other joiner characters are not removed", () => {
+  for (const text of ["fu\u200Cck", "fu\u200Dck"]) {
+    const result = detectHarmfulLanguage(text);
+
+    assert.equal(result.detected, false);
+    assert.equal(result.matches.length, 0);
+  }
+});
+
+test("uppercase match preserves source casing", () => {
+  const text = "SHIT";
+  const result = detectHarmfulLanguage(text);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].phrase, text);
+  assertMatchOffsets(text, result.matches);
+});
+
+test("normalized matches remain left-to-right with original offsets", () => {
+  const text = "f\u200Buck and ｉｄｉｏｔ";
+  const result = detectHarmfulLanguage(text);
+
+  assert.deepEqual(
+    normalize(result.matches.map(({ phrase, category }) => ({ phrase, category }))),
+    [
+      { phrase: "f\u200Buck", category: "profanity" },
+      { phrase: "ｉｄｉｏｔ", category: "insult" }
+    ]
+  );
+  assert.deepEqual(
+    normalize(result.matches.map(({ startIndex, endIndex }) => [startIndex, endIndex])),
+    [[0, 5], [10, 15]]
+  );
+  assertMatchOffsets(text, result.matches);
+});
+
+test("normalization map translates f-zero-width-uck normalized indexes to source span", () => {
+  const text = "f\u200Buck";
+  const mapping = normalizeForMatching(text);
+
+  assert.equal(mapping.text, "fuck");
+  assert.deepEqual(
+    normalize(mapNormalizedSpanToOriginal(0, 4, mapping)),
+    { startIndex: 0, endIndex: 5 }
+  );
+  assert.equal(
+    text.slice(...Object.values(normalize(mapNormalizedSpanToOriginal(0, 4, mapping)))),
+    text
+  );
 });
 
 test("punctuation around a phrase is a valid word boundary", () => {

@@ -1,11 +1,12 @@
 /**
  * detector.js
  * -----------
- * Local harmful-language detection kept separate from DOM scanning.
+ * Deterministic local harmful-language detection kept separate from DOM scanning.
  *
- * The returned result is deliberately independent of the DOM. A future
- * classifier or API adapter can produce the same shape without requiring
- * changes to content.js.
+ * Matching uses structured phrase rules and narrowly scoped normalization.
+ * Returned matches preserve offsets into the original JavaScript string, so
+ * callers can annotate source text without depending on normalized spelling.
+ * The returned result is independent of the DOM and does not make network calls.
  */
 
 const HARMFUL_RULES = [
@@ -23,18 +24,66 @@ const HARMFUL_RULES = [
   { phrase: "kill yourself", category: "self-harm encouragement", severity: "high" }
 ];
 
+const REMOVED_MATCHING_CHARACTERS = new Set([0x200B, 0x2060, 0xFEFF]);
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function createRulePattern(phrase) {
-  // Capture the leading boundary so offsets refer to the original phrase.
+  // Capture the leading boundary so match offsets exclude the boundary itself.
   return new RegExp(
     "(^|[^\\p{L}\\p{N}\\p{M}_])" +
       escapeRegExp(phrase).replace(/\s+/g, "\\s+") +
       "(?=$|[^\\p{L}\\p{N}\\p{M}_])",
     "giu"
   );
+}
+
+function normalizeForMatching(originalText) {
+  let text = "";
+  const sourceStartByIndex = [];
+  const sourceEndByIndex = [];
+
+  for (let sourceIndex = 0; sourceIndex < originalText.length;) {
+    const codePoint = originalText.codePointAt(sourceIndex);
+    const sourceLength = codePoint > 0xFFFF ? 2 : 1;
+
+    if (REMOVED_MATCHING_CHARACTERS.has(codePoint)) {
+      sourceIndex += sourceLength;
+      continue;
+    }
+
+    const normalizedCharacter = codePoint >= 0xFF01 && codePoint <= 0xFF5E
+      ? String.fromCharCode(codePoint - 0xFEE0)
+      : originalText.slice(sourceIndex, sourceIndex + sourceLength);
+
+    text += normalizedCharacter;
+    for (let index = 0; index < normalizedCharacter.length; index++) {
+      if (codePoint >= 0xFF01 && codePoint <= 0xFF5E) {
+        sourceStartByIndex.push(sourceIndex);
+        sourceEndByIndex.push(sourceIndex + sourceLength);
+      } else {
+        sourceStartByIndex.push(sourceIndex + index);
+        sourceEndByIndex.push(sourceIndex + index + 1);
+      }
+    }
+
+    sourceIndex += sourceLength;
+  }
+
+  return { text, sourceStartByIndex, sourceEndByIndex };
+}
+
+function mapNormalizedSpanToOriginal(start, end, mapping) {
+  if (start < 0 || end <= start || end > mapping.sourceStartByIndex.length) {
+    return null;
+  }
+
+  return {
+    startIndex: mapping.sourceStartByIndex[start],
+    endIndex: mapping.sourceEndByIndex[end - 1]
+  };
 }
 
 /**
@@ -54,25 +103,29 @@ function createRulePattern(phrase) {
  */
 function detectHarmfulLanguage(text) {
   const originalText = typeof text === "string" ? text : "";
+  const mapping = normalizeForMatching(originalText);
   const matches = [];
 
   HARMFUL_RULES.forEach((rule, ruleOrder) => {
     const pattern = createRulePattern(rule.phrase);
     let match;
 
-    while ((match = pattern.exec(originalText)) !== null) {
-      const phraseStart = match.index + match[1].length;
-      const phrase = originalText.slice(
-        phraseStart,
-        phraseStart + match[0].length - match[1].length
+    while ((match = pattern.exec(mapping.text)) !== null) {
+      const normalizedStart = match.index + match[1].length;
+      const normalizedEnd = normalizedStart + match[0].length - match[1].length;
+      const sourceSpan = mapNormalizedSpanToOriginal(
+        normalizedStart,
+        normalizedEnd,
+        mapping
       );
+      const phrase = originalText.slice(sourceSpan.startIndex, sourceSpan.endIndex);
 
       matches.push({
         phrase,
         category: rule.category,
         severity: rule.severity,
-        startIndex: phraseStart,
-        endIndex: phraseStart + phrase.length,
+        startIndex: sourceSpan.startIndex,
+        endIndex: sourceSpan.endIndex,
         ruleOrder
       });
 
