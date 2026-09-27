@@ -5,11 +5,11 @@
  * (see "matches": ["<all_urls>"] in manifest.json).
  *
  * WHAT IT DOES (the pipeline):
- *   Webpage DOM
- *     -> read visible text from paragraph-like elements
+ *   Webpage DOM (one initial scan)
+ *     -> read direct text from eligible visible elements
  *     -> hand each text block to detector.js
  *     -> mark exact harmful phrases and add local user controls
- *     -> log matches and keep a summary for the popup
+ *     -> keep aggregate scan counts for the popup
  *
  * The original phrase remains recoverable inside its marker. The default view
  * softly obscures it, while the user can reveal it or view a local prototype
@@ -29,6 +29,7 @@ const READABLE_SELECTORS = [
 
 const SCANNED_ATTR = "data-bps-scanned";
 const FLAG_ATTR = "data-bps-flag";
+let nextFlagPanelId = 0;
 
 /**
  * Decide whether an element is worth scanning.
@@ -111,14 +112,22 @@ function setFlagState(marker, state) {
   const showOriginalButton = marker.querySelector("[data-bps-action='original']");
   const saferButton = marker.querySelector("[data-bps-action='safer']");
 
-  marker.dataset.bpsState = state;
+  marker.dataset.bpsDisplay = state;
   original.hidden = state === "safer";
   safer.hidden = state !== "safer";
-  marker.classList.toggle("bps-is-revealed", state === "original");
-  marker.classList.toggle("bps-is-safer", state === "safer");
   showOriginalButton.textContent = state === "original" ? "Hide original" : "Show original";
   showOriginalButton.setAttribute("aria-pressed", String(state === "original"));
   saferButton.setAttribute("aria-pressed", String(state === "safer"));
+}
+
+function setFlagOpen(marker, isOpen, restoreFocus = false) {
+  const trigger = marker.querySelector(".bps-flag-trigger");
+  const panel = marker.querySelector(".bps-flag-panel");
+
+  marker.dataset.bpsOpen = String(isOpen);
+  panel.hidden = !isOpen;
+  trigger.setAttribute("aria-expanded", String(isOpen));
+  if (!isOpen && restoreFocus) trigger.focus();
 }
 
 function addFlagControls(marker, match, originalNode) {
@@ -145,15 +154,15 @@ function addFlagControls(marker, match, originalNode) {
   triggerIcon.textContent = "!";
   const triggerLabel = document.createElement("span");
   triggerLabel.className = "bps-flag-trigger-label";
-  triggerLabel.textContent = "Potentially harmful";
+  triggerLabel.textContent = "Potentially harmful phrase";
   trigger.append(triggerIcon, triggerLabel);
 
   const panel = document.createElement("span");
   panel.className = "bps-flag-panel";
-  panel.setAttribute("role", "group");
+  panel.setAttribute("role", "region");
   panel.setAttribute("aria-label", "Harmful phrase details");
   panel.hidden = true;
-  const panelId = "bps-flag-panel-" + Math.random().toString(36).slice(2);
+  const panelId = "bps-flag-panel-" + nextFlagPanelId++;
   panel.id = panelId;
   trigger.setAttribute("aria-controls", panelId);
 
@@ -171,7 +180,7 @@ function addFlagControls(marker, match, originalNode) {
 
   const saferDetail = document.createElement("span");
   saferDetail.className = "bps-flag-detail bps-flag-detail-safe";
-  saferDetail.textContent = "Safer alternative: " + getSaferVersion(match);
+  saferDetail.textContent = "Prototype safer alternative: " + getSaferVersion(match);
 
   const controls = document.createElement("span");
   controls.className = "bps-flag-actions";
@@ -182,13 +191,15 @@ function addFlagControls(marker, match, originalNode) {
   showOriginalButton.setAttribute("data-bps-action", "original");
   showOriginalButton.setAttribute("aria-pressed", "false");
   showOriginalButton.textContent = "Show original";
+  showOriginalButton.setAttribute("aria-label", "Reveal or hide the original phrase");
 
   const saferButton = document.createElement("button");
   saferButton.type = "button";
   saferButton.className = "bps-flag-button";
   saferButton.setAttribute("data-bps-action", "safer");
   saferButton.setAttribute("aria-pressed", "false");
-  saferButton.textContent = "Safer version";
+  saferButton.textContent = "View safer alternative";
+  saferButton.setAttribute("aria-label", "View the prototype safer alternative");
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
@@ -201,39 +212,30 @@ function addFlagControls(marker, match, originalNode) {
   panel.append(summary, description, originalDetail, saferDetail, controls);
   marker.replaceChildren(original, safer, trigger, panel);
   trigger.addEventListener("click", () => {
-    const isOpen = !panel.hidden;
-    panel.hidden = isOpen;
-    trigger.setAttribute("aria-expanded", String(!isOpen));
-    marker.dataset.bpsPanel = isOpen ? "closed" : "open";
-    if (isOpen) trigger.focus();
+    setFlagOpen(marker, marker.dataset.bpsOpen !== "true");
   });
   showOriginalButton.addEventListener("click", () => {
-    setFlagState(marker, marker.dataset.bpsState === "original" ? "hidden" : "original");
+    setFlagState(marker, marker.dataset.bpsDisplay === "original" ? "protected" : "original");
   });
   saferButton.addEventListener("click", () => {
-    setFlagState(marker, marker.dataset.bpsState === "safer" ? "hidden" : "safer");
+    setFlagState(marker, marker.dataset.bpsDisplay === "safer" ? "protected" : "safer");
   });
   closeButton.addEventListener("click", () => {
-    panel.hidden = true;
-    trigger.setAttribute("aria-expanded", "false");
-    marker.dataset.bpsPanel = "closed";
-    trigger.focus();
+    setFlagOpen(marker, false, true);
   });
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      panel.hidden = true;
-      trigger.setAttribute("aria-expanded", "false");
-      marker.dataset.bpsPanel = "closed";
-      trigger.focus();
+      event.preventDefault();
+      setFlagOpen(marker, false, true);
     }
   });
-  marker.dataset.bpsPanel = "closed";
-  setFlagState(marker, "hidden");
+  marker.dataset.bpsOpen = "false";
+  setFlagState(marker, "protected");
 }
 
 /**
  * Add a marker around one match without replacing the containing element.
- * Matches spanning nested elements are deliberately skipped because wrapping
+ * Matches spanning multiple direct text nodes are skipped because wrapping
  * them could move or break unrelated markup and event-listener boundaries.
  */
 function flagMatch(textNodes, match) {
@@ -289,25 +291,25 @@ function flagMatches(textNodes, matches) {
 }
 
 /**
- * Scan the whole document once.
+ * Scan eligible elements in the document once.
  * Returns a summary object: { scannedCount, matches: [...] }
  */
 function scanPage() {
   const elements = document.querySelectorAll(READABLE_SELECTORS.join(","));
 
   let scannedCount = 0;
-  const matches = [];
+  let harmfulCount = 0;
 
   const detect = window.ProtectionScanner && window.ProtectionScanner.detectHarmfulLanguage;
   if (typeof detect !== "function") {
-    console.warn("[Basic Protection Scanner] detector.js not loaded — skipping scan.");
+    console.warn("[Sensitive Content Detector] detector.js not loaded — skipping scan.");
     return { scannedCount: 0, matches: [] };
   }
 
   elements.forEach((el) => {
     if (!isScannableElement(el)) return;
 
-    // Mark as scanned so re-runs (e.g. dynamic content) skip it.
+    // Avoid processing the same element again if this scan is invoked later.
     el.setAttribute(SCANNED_ATTR, "true");
 
     const directText = getDirectText(el);
@@ -319,29 +321,11 @@ function scanPage() {
     const result = detect(text);
     if (result.detected) {
       flagMatches(directText.textNodes, result.matches);
-
-      result.matches.forEach((match) => {
-        matches.push({
-          tag: el.tagName.toLowerCase(),
-          ...match,
-          snippet: result.originalText
-        });
-
-        // Log each match clearly in the browser console.
-        console.log("[Basic Protection Scanner]");
-        console.log("Harmful language detected:");
-        console.log("  Element: <" + el.tagName.toLowerCase() + ">");
-        console.log("  Matched phrase: \u201c" + match.phrase + "\u201d");
-        console.log("  Category: " + match.category);
-        console.log("  Severity: " + match.severity);
-        console.log("  Text: \u201c" + result.originalText + "\u201d");
-        // Also log the actual DOM element so it can be inspected/clicked.
-        console.log("  DOM element:", el);
-      });
+      harmfulCount += result.matches.length;
     }
   });
 
-  return { scannedCount, matches };
+  return { scannedCount, harmfulCount };
 }
 
 /**
@@ -356,7 +340,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   sendResponse({
     active: true,
     scannedCount: latestSummary ? latestSummary.scannedCount : 0,
-    harmfulCount: latestSummary ? latestSummary.matches.length : 0,
+    harmfulCount: latestSummary ? latestSummary.harmfulCount : 0,
     updatedAt: latestSummary ? latestSummary.updatedAt : null
   });
 });
@@ -370,10 +354,6 @@ function runScan() {
     ...summary,
     updatedAt: Date.now()
   };
-
-  console.log("[Basic Protection Scanner]");
-  console.log("Scanned elements: " + summary.scannedCount);
-  console.log("Harmful matches: " + summary.matches.length);
 
 }
 

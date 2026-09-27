@@ -1,117 +1,127 @@
-# Basic Protection Scanner (V1 Prototype)
+# Sensitive Content Detector
 
-A minimal Chrome extension (Manifest V3) that scans the visible text on a
-webpage and checks it against a simple **local, keyword-based** harmful-language
-list. Detected phrases are softly marked and provide local show-original and
-safer-version controls. The extension uses **no AI, API, backend, or database**.
+Sensitive Content Detector is a Chrome Extension prototype built with Manifest
+V3. It has two demonstration surfaces:
 
----
+- **Interactive Analyzer** — users test a message and review local rule-based
+  phrase matches before sending it.
+- **Browser Protection** — the extension scans eligible text on the current
+  webpage, marks supported phrases, and lets users reveal the original or view
+  a prototype alternative.
 
-## Folder structure
+The project runs locally in the browser. It does not use AI, external APIs, a
+backend, accounts, or a database. Its product principle is **Detect →
+Understand → Choose**: show what a local rule flagged and let the user decide
+what to view.
 
-```
+## Project structure
+
+```text
 basic-protection-scanner/
-├── manifest.json     # Extension config (MV3): permissions, popup, content scripts
-├── detector.js       # The harmful-language detector (keyword list) — the swappable piece
-├── content.js        # Scans the page DOM, calls the detector, flags matches
-├── flagging.css      # Subtle styling for detected harmful phrases
-├── popup.html        # Small popup UI markup + styles
-├── popup.js          # Fills the popup with the latest scan numbers
-├── test-page.html    # A sample page for testing detection
-└── README.md         # This file
+├── manifest.json          # Manifest V3 configuration and content-script setup
+├── detector.js            # Local phrase rules, normalization, and matching
+├── content.js             # One-time webpage scan and moderation controls
+├── flagging.css           # Styling for extension-injected phrase controls
+├── popup.html             # Per-tab scan summary markup
+├── popup.js               # Reads and displays the active tab's summary
+├── test-page.html         # Standalone analyzer and browser-protection demo
+├── demo.js                # Analyzer and preview UI behavior
+├── demo.css               # Demo page styles
+├── tests/
+│   └── detector.test.js   # Dependency-free detector regression suite
+└── README.md
 ```
 
-## What each file does
+## Architecture and behavior
 
-- **manifest.json** — Declares the extension as Manifest V3. Registers the
-  content scripts (`detector.js` then `content.js`, in that order so the
-  detector is defined first), and the popup. The popup requests the current
-  tab's summary directly from
-  its content script, so summaries are not shared between tabs.
-- **detector.js** — Holds the sample harmful-language rules (`idiot`, `stupid`,
-  `hate you`, `shut up`, ...) and the `detectHarmfulLanguage(text)` function.
-  Matching is **case-insensitive**, word-boundary-aware, and returns all
-  matches with phrase offsets, category, and severity. It exposes itself via
-  `window.ProtectionScanner`, so a future AI/API classifier can replace this
-  file without changing the DOM scanner.
-- **content.js** — Runs on every page. It selects paragraph-like elements
-  (`p, span, div, li, article, section, h1–h6`), skips `script/style/noscript/
-  input/textarea` and hidden elements, avoids re-scanning elements (via a
-  `data-bps-scanned` marker), reads each element's exact direct text, sends it
-  to the detector, adds a `data-bps-flag` marker around safely mappable
-  harmful phrases, adds local show-original and safer-version controls, logs
-  matches, and keeps a summary for the popup. It does not replace large
-  containers or use `innerHTML`.
-- **flagging.css** — Provides a subtle highlight and small controls for marked
-  phrases. The original text remains in the marker and can be shown again at
-  any time; the local safer version is a separate display state.
-- **popup.html / popup.js** — Show "Scanner active", the total text blocks
-  scanned, and the number of harmful matches by requesting the active tab's
-  content script. Restricted pages show an unavailable state.
-- **test-page.html** — A ready-made page with a mix of clean and harmful lines
-  (and one hidden line that should be ignored) to demonstrate detection.
+- **`manifest.json`** loads `detector.js` before `content.js` as Manifest V3
+  content scripts and configures the extension popup.
+- **`detector.js`** exposes `window.ProtectionScanner.detectHarmfulLanguage()`.
+  It applies structured local rules for insults, profanity, hostile language,
+  threats, and self-harm encouragement. Matching is case-insensitive,
+  Unicode-aware at word boundaries, and deterministic: leftmost matches win,
+  longer matches take precedence at the same start, and rule order breaks
+  otherwise equal ties. Overlapping detections are removed.
+- The detector maps only approved fullwidth ASCII forms to ASCII for matching
+  and ignores U+200B, U+2060, and U+FEFF during matching. It does not apply
+  general Unicode compatibility normalization or map arbitrary homoglyphs.
+  Match phrases and offsets refer to the original JavaScript string
+  (UTF-16 indexes), including any removed invisible characters within the
+  matched source span.
+- **`content.js`** performs one initial scan of eligible visible
+  paragraph-like elements. It detects each element's direct text, then inserts
+  user controls for matches that fit within a single text node. Matches that
+  span nested or multiple text nodes are skipped. Dynamic page changes are not
+  observed or rescanned automatically. Normal operation does not log raw page
+  text or live DOM elements.
+- **`flagging.css`** styles the injected controls. Users can show or hide the
+  original phrase or view a local prototype alternative; content is not
+  permanently removed.
+- **`popup.html` / `popup.js`** show scan totals for the active tab by querying
+  that tab's content script. The summary stays in that tab's content-script
+  memory and contains counts, not page text. Chrome-restricted pages may not
+  allow the content script to run.
+- **`test-page.html`, `demo.js`, and `demo.css`** provide a standalone demo.
+  The analyzer calls the same local detector, and its Protection Preview uses
+  the analyzer's actual matches and offsets. The discussion thread is ordinary
+  page markup intended to demonstrate the extension's injected controls when
+  the extension is installed and enabled for that page.
 
-## Pipeline
+The detector returns a DOM-independent result shaped like:
 
+```js
+{
+  detected: true,
+  originalText: "You are such an idiot.",
+  matches: [
+    {
+      phrase: "idiot",
+      category: "insult",
+      severity: "low",
+      startIndex: 16,
+      endIndex: 21
+    }
+  ],
+  suggestedRewrite: null
+}
 ```
-Webpage DOM
-  → content.js scans visible text
-  → detector.js checks text
-  → result object { detected, originalText, matches, suggestedRewrite }
-  → phrase marker with local controls
-  → console log + current-tab popup summary
+
+The current detector does not interpret negation, quotation, reported speech,
+sarcasm, intent, or full conversational context. Categories and severity are
+rule metadata, not a semantic judgment about the whole message. Safer
+alternatives are prototype suggestions, not generated rewrites.
+
+## Load the extension in Chrome
+
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Select **Load unpacked** and choose this repository directory.
+4. To test local files, open the extension's **Details** and enable **Allow
+   access to file URLs**.
+5. Open `test-page.html` in Chrome. The analyzer works as a standalone demo;
+   the injected Browser Protection controls require the extension to be loaded
+   and permitted to run on the page.
+
+## Run the detector tests
+
+From the repository root, run:
+
+```sh
+node --test tests/detector.test.js
 ```
 
----
+The dependency-free regression suite covers classification, source casing and
+offsets, multiple matches, boundaries, overlap precedence, approved
+normalization, and documented contextual limitations.
 
-## How to load the extension in Chrome
+## Known limitations and possible follow-up work
 
-1. Open Chrome and go to `chrome://extensions`.
-2. Turn on **Developer mode** (toggle in the top-right corner).
-3. Click **Load unpacked**.
-4. Select the `basic-protection-scanner` folder.
-5. The extension should appear in the list and its icon in the toolbar.
-
-## How to test it
-
-1. Open the included `test-page.html` in Chrome. The easiest way:
-   - Drag `test-page.html` into a Chrome tab, **or**
-   - Right-click the file → Open With → Chrome.
-   > Note: To let the extension run on local `file://` pages, open
-   > `chrome://extensions`, click **Details** on the extension, and enable
-   > **Allow access to file URLs**. Otherwise just test on any normal website.
-2. Open DevTools (`Cmd+Option+I` on macOS / `F12`) and click the **Console** tab.
-3. You should see output like:
-
-   ```
-   [Basic Protection Scanner]
-   Harmful language detected:
-     Element: <p>
-     Matched phrase: “idiot”
-     Text: “You are such an idiot.”
-   ...
-   [Basic Protection Scanner]
-   Scanned elements: 7
-   Harmful matches: 4
-   ```
-
-4. Click the extension icon to open the **popup**. It shows:
-   - "Scanner active"
-   - Text blocks scanned
-   - Harmful matches found
-
----
-
-## What should be built next
-
-- **Swap the detector**: replace the local keyword rules in `detector.js` with
-  an AI/API classifier later (keep the same `detectHarmfulLanguage` contract
-  so nothing else changes). The current extension makes no external requests.
-- **Rescan dynamic content**: use a `MutationObserver` to catch text added after
-  load (infinite scroll, single-page apps).
-- **More complete inline scanning**: use a text-node mapping to detect phrases
-  split across nested inline elements.
-- **Options page**: let users edit the word list and severity levels.
-- **Better matching**: word-boundary matching to reduce false positives (e.g.
-  avoid matching inside unrelated words).
-```
+- Add dynamic-content rescanning if the product requires support for
+  single-page applications and infinite-scroll pages.
+- Support matches spanning nested inline elements while safely mapping text
+  offsets back to DOM nodes.
+- Evaluate contextual classification and user-configurable sensitivity only
+  as separately scoped future work; neither exists in this prototype.
+- The local detector may eventually be replaced behind its public result
+  contract, but this repository currently makes no network requests and does
+  not include an AI/API implementation.

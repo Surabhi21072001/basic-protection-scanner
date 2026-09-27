@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Basic Protection Scanner",
+  "name": "Sensitive Content Detector",
   "version": "1.0.0",
-  "description": "Version 1 prototype: scans visible webpage text and detects harmful language using a simple local keyword list.",
+  "description": "Local rule-based prototype that detects potentially harmful phrases on webpages and gives users review controls.",
 
   "action": {
-    "default_title": "Basic Protection Scanner",
+    "default_title": "Sensitive Content Detector",
     "default_popup": "popup.html"
   },
 
