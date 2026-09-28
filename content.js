@@ -47,6 +47,9 @@ function isScannableElement(el) {
   // Skip elements we've already looked at.
   if (el.hasAttribute(SCANNED_ATTR)) return false;
 
+  // Never scan controls or source text inserted by an earlier flag.
+  if (el.closest("[" + FLAG_ATTR + "]")) return false;
+
   // Skip tags that never contain readable prose.
   const tag = el.tagName.toLowerCase();
   const SKIP_TAGS = ["script", "style", "noscript", "input", "textarea"];

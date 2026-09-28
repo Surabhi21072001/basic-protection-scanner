@@ -13,7 +13,7 @@
       <span>Sensitive Content Detector</span>
     </a>
     <div class="header-meta">
-      <span class="prototype-badge">Local prototype</span>
+      <span class="prototype-badge">Local AI prototype</span>
       <span class="header-status"><span class="status-dot" aria-hidden="true"></span> User-controlled</span>
     </div>
   </header>
@@ -82,7 +82,7 @@
       <div class="section-heading">
         <p class="eyebrow">INTERACTIVE TEXT ANALYZER</p>
         <h2 id="analyzer-title">Try a message before you send it</h2>
-        <p>Try a sentence to see what the local prototype notices before you send it.</p>
+        <p>Try a sentence to see what a local Ollama model notices before you send it.</p>
       </div>
       <ol class="guided-steps" aria-label="Analyzer steps">
         <li data-guided-step="enter" aria-current="step"><span>1</span> Enter</li>
@@ -95,7 +95,7 @@
           <label for="analyzer-input">Your message</label>
           <textarea id="analyzer-input" name="analyzer-input" rows="6" placeholder="Write a sentence or choose an example below..."></textarea>
           <div class="input-meta">
-            <span>Local prototype · no text leaves your browser</span>
+            <span>Local Ollama model · text stays on your computer</span>
             <span id="input-count">0 / 500</span>
           </div>
           <div class="analyzer-actions">
@@ -161,8 +161,8 @@
         <div class="preview-message-panel" id="preview-with" aria-label="Message with protection" hidden></div>
       </section>
       <aside class="local-prototype-note" aria-label="Prototype limitations and privacy">
-        <strong>Local prototype</strong>
-        <span>Analysis runs in your browser; no text is sent to an external service. This rule-based prototype may not understand negation, quotation, reported speech, sarcasm, or intent.</span>
+        <strong>Local AI prototype</strong>
+        <span>Submitted analyzer text is sent only to Ollama running on this computer. It is not sent to a cloud service. AI results may be inaccurate.</span>
       </aside>
     </section>
 
@@ -176,7 +176,7 @@
         <article class="principle-card card">
           <span class="step-number">01</span>
           <h3>Detect</h3>
-          <p>Local rules identify potentially harmful phrases without sending page text anywhere.</p>
+          <p>The analyzer uses local Ollama AI; automatic browser protection continues to use local phrase rules.</p>
         </article>
         <article class="principle-card card">
           <span class="step-number">02</span>
@@ -237,6 +237,7 @@
   </main>
 
   <script src="detector.js"></script>
+  <script src="ollama.js"></script>
   <script src="demo.js"></script>
 
   <footer class="site-footer">

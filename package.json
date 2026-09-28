@@ -1,0 +1,12 @@
+{
+  "name": "basic-protection-scanner",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:llm": "RUN_OLLAMA_TESTS=1 node --test tests/ollama.integration.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^27.0.0"
+  }
+}
