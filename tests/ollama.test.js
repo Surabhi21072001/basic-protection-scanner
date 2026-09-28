@@ -20,7 +20,9 @@ function createAnalyzer(modelResult, responseOptions = {}) {
         ok: responseOptions.ok !== false,
         status: responseOptions.status || 200,
         json: async () => ({
-          message: { content: JSON.stringify(modelResult) }
+          message: {
+            content: responseOptions.content || JSON.stringify(modelResult)
+          }
         })
       };
     }
@@ -64,7 +66,7 @@ test("maps an AI phrase to source offsets and creates a contextual rewrite", asy
   assert.equal(requestBody.keep_alive, "30m");
   assert.equal(requestBody.options.num_predict, 256);
   assert.equal(requestBody.messages[1].content, "I am dumb");
-  assert.match(requestBody.messages[0].content, /phrase 'dumb'/);
+  assert.match(requestBody.messages[0].content, /one match per negative term/);
 });
 
 test("rejects model phrases that do not occur in the submitted text", async () => {
@@ -102,8 +104,8 @@ test("replaces paragraph-style output with a short category fallback", async () 
 
   assert.equal(result.detected, true);
   assert.equal(result.matches[0].phrase, "dumb");
-  assert.equal(result.matches[0].replacement, "mistaken");
-  assert.equal(result.suggestedRewrite, "I am mistaken");
+  assert.equal(result.matches[0].replacement, "still learning");
+  assert.equal(result.suggestedRewrite, "I am still learning");
 });
 
 test("maps multiple AI matches and rewrites them without shifting offsets", async () => {
@@ -141,7 +143,7 @@ test("maps multiple AI matches and rewrites them without shifting offsets", asyn
       { phrase: "stupid", startIndex: 16, endIndex: 22 }
     ]
   );
-  assert.equal(result.suggestedRewrite, "I feel still learning and mistaken");
+  assert.equal(result.suggestedRewrite, "I feel still learning and still learning");
   result.matches.forEach((match) => {
     assert.equal(text.slice(match.startIndex, match.endIndex), match.phrase);
   });
@@ -174,7 +176,104 @@ test("maps repeated AI phrases to distinct occurrences", async () => {
     normalize(result.matches.map(({ startIndex, endIndex }) => [startIndex, endIndex])),
     [[0, 4], [10, 14]]
   );
-  assert.equal(result.suggestedRewrite, "mistaken then mistaken");
+  assert.equal(result.suggestedRewrite, "still learning then still learning");
+});
+
+test("splits a compound AI phrase into separate matches", async () => {
+  const { analyze } = createAnalyzer({
+    negative: true,
+    matches: [{
+      phrase: "I am stupid and ugly",
+      category: "insult",
+      severity: "medium",
+      replacement: "still learning and unique",
+      explanation: "These are negative descriptions."
+    }]
+  });
+
+  const result = await analyze("I am stupid and ugly");
+
+  assert.deepEqual(
+    normalize(result.matches.map(({ phrase, replacement }) => ({
+      phrase,
+      replacement
+    }))),
+    [
+      { phrase: "stupid", replacement: "still learning" },
+      { phrase: "ugly", replacement: "unique" }
+    ]
+  );
+  assert.equal(result.suggestedRewrite, "I am still learning and unique");
+});
+
+test("replaces invented model specifics with general positive language", async () => {
+  const { analyze } = createAnalyzer({
+    negative: true,
+    matches: [
+      {
+        phrase: "stupid",
+        category: "negative self-talk",
+        severity: "medium",
+        replacement: "I am terrible at math",
+        explanation: "Negative language."
+      },
+      {
+        phrase: "ugly",
+        category: "negative self-talk",
+        severity: "medium",
+        replacement: "have acne",
+        explanation: "Negative language."
+      }
+    ]
+  });
+
+  const result = await analyze("I am stupid and ugly");
+
+  assert.deepEqual(
+    normalize(result.matches.map(({ phrase, replacement }) => ({
+      phrase,
+      replacement
+    }))),
+    [
+      { phrase: "stupid", replacement: "still learning" },
+      { phrase: "ugly", replacement: "unique" }
+    ]
+  );
+  assert.equal(result.suggestedRewrite, "I am still learning and unique");
+});
+
+test("uses reliable fallback matches when the small model misses common terms", async () => {
+  const { analyze } = createAnalyzer({
+    negative: false,
+    matches: []
+  });
+
+  const result = await analyze("I am stupid and ugly");
+
+  assert.deepEqual(
+    normalize(result.matches.map(({ phrase, replacement }) => ({
+      phrase,
+      replacement
+    }))),
+    [
+      { phrase: "stupid", replacement: "still learning" },
+      { phrase: "ugly", replacement: "unique" }
+    ]
+  );
+  assert.equal(result.suggestedRewrite, "I am still learning and unique");
+});
+
+test("uses reliable fallbacks when model JSON is truncated", async () => {
+  const { analyze } = createAnalyzer(
+    { negative: false, matches: [] },
+    { content: '{"negative":true,"matches":[' }
+  );
+
+  const result = await analyze("I am dumb");
+
+  assert.equal(result.detected, true);
+  assert.equal(result.matches[0].phrase, "dumb");
+  assert.equal(result.matches[0].replacement, "still learning");
 });
 
 test("surfaces an Ollama HTTP error", async () => {

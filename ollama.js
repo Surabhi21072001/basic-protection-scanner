@@ -8,6 +8,33 @@ const OLLAMA_PRELOAD_URL = "http://localhost:11434/api/generate";
 const OLLAMA_MODEL = "llama3.2:1b";
 const OLLAMA_KEEP_ALIVE = "30m";
 
+const GENERAL_POSITIVE_REPLACEMENTS = {
+  dumb: {
+    replacement: "still learning",
+    category: "negative self-talk"
+  },
+  stupid: {
+    replacement: "still learning",
+    category: "negative self-talk"
+  },
+  idiot: {
+    replacement: "person who made a mistake",
+    category: "insult"
+  },
+  moron: {
+    replacement: "person who made a mistake",
+    category: "insult"
+  },
+  ugly: {
+    replacement: "unique",
+    category: "negative self-talk"
+  },
+  loser: {
+    replacement: "capable person",
+    category: "insult"
+  }
+};
+
 const OLLAMA_RESPONSE_SCHEMA = {
   type: "object",
   properties: {
@@ -42,19 +69,13 @@ const OLLAMA_RESPONSE_SCHEMA = {
             type: "string",
             maxLength: 60,
             description: "A replacement fragment of no more than six words and no sentence punctuation."
-          },
-          explanation: {
-            type: "string",
-            maxLength: 160,
-            description: "One brief sentence explaining why the phrase is negative."
           }
         },
         required: [
           "phrase",
           "category",
           "severity",
-          "replacement",
-          "explanation"
+          "replacement"
         ]
       }
     }
@@ -86,6 +107,11 @@ function getFallbackReplacement(category) {
   return replacements[category] || "more constructive";
 }
 
+function getGeneralPositiveReplacement(phrase) {
+  const entry = GENERAL_POSITIVE_REPLACEMENTS[phrase.toLocaleLowerCase()];
+  return entry ? entry.replacement : null;
+}
+
 function minimizeWholeMessagePhrase(text, phrase, category) {
   if (
     phrase.toLocaleLowerCase() !== text.trim().toLocaleLowerCase() ||
@@ -99,11 +125,49 @@ function minimizeWholeMessagePhrase(text, phrase, category) {
   return minimized || phrase;
 }
 
+function expandCompoundMatches(text, rawMatches) {
+  const expanded = [];
+
+  for (const rawMatch of Array.isArray(rawMatches) ? rawMatches : []) {
+    if (!rawMatch || typeof rawMatch.phrase !== "string") {
+      expanded.push(rawMatch);
+      continue;
+    }
+
+    const phrase = minimizeWholeMessagePhrase(
+      text,
+      rawMatch.phrase.trim(),
+      rawMatch.category
+    );
+    const phraseParts = phrase.split(/\s+and\s+/i);
+    if (phraseParts.length < 2) {
+      expanded.push({ ...rawMatch, phrase });
+      continue;
+    }
+
+    const replacementParts = typeof rawMatch.replacement === "string"
+      ? rawMatch.replacement.split(/\s+and\s+/i)
+      : [];
+
+    phraseParts.forEach((phrasePart, index) => {
+      expanded.push({
+        ...rawMatch,
+        phrase: phrasePart.trim(),
+        replacement: replacementParts.length === phraseParts.length
+          ? replacementParts[index].trim()
+          : ""
+      });
+    });
+  }
+
+  return expanded;
+}
+
 function validateMatches(text, rawMatches) {
   const matches = [];
   const nextSearchByPhrase = new Map();
 
-  for (const rawMatch of Array.isArray(rawMatches) ? rawMatches : []) {
+  for (const rawMatch of expandCompoundMatches(text, rawMatches)) {
     if (
       !rawMatch ||
       typeof rawMatch.phrase !== "string" ||
@@ -120,13 +184,20 @@ function validateMatches(text, rawMatches) {
       rawMatch.category
     );
     let replacement = rawMatch.replacement.trim();
+    const generalReplacement = getGeneralPositiveReplacement(phrase);
     const replacementWordCount = replacement.split(/\s+/).length;
 
     if (!phrase) continue;
 
-    // Replace paragraph-style model output with a short category fallback.
-    // The replacement must fit directly into the original phrase's position.
-    if (!replacement || replacementWordCount > 6 || /[.!?]/.test(replacement)) {
+    if (generalReplacement) {
+      replacement = generalReplacement;
+    } else if (
+      !replacement ||
+      replacementWordCount > 6 ||
+      /[.!?]/.test(replacement) ||
+      /^(?:i|you|he|she|we|they|have|has|had)\b/i.test(replacement)
+    ) {
+      // Reject paragraphs, complete sentences, and invented personal details.
       replacement = getFallbackReplacement(rawMatch.category);
     }
 
@@ -160,6 +231,45 @@ function validateMatches(text, rawMatches) {
     }
     return accepted;
   }, []);
+}
+
+function addReliableFallbackMatches(text, modelMatches) {
+  const matches = modelMatches.slice();
+
+  Object.entries(GENERAL_POSITIVE_REPLACEMENTS).forEach(([phrase, metadata]) => {
+    const pattern = new RegExp(
+      "(^|[^\\p{L}\\p{N}\\p{M}_])" +
+        phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+        "(?=$|[^\\p{L}\\p{N}\\p{M}_])",
+      "giu"
+    );
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+      const startIndex = match.index + match[1].length;
+      const endIndex = startIndex + phrase.length;
+      const overlapsExisting = matches.some((existing) =>
+        startIndex < existing.endIndex && endIndex > existing.startIndex
+      );
+
+      if (!overlapsExisting) {
+        matches.push({
+          phrase: text.slice(startIndex, endIndex),
+          category: metadata.category,
+          severity: "medium",
+          replacement: metadata.replacement,
+          explanation: "This is a negative description that can be expressed more constructively.",
+          startIndex,
+          endIndex
+        });
+      }
+
+      if (match[0].length === 0) pattern.lastIndex += 1;
+    }
+  });
+
+  matches.sort((left, right) => left.startIndex - right.startIndex);
+  return matches;
 }
 
 function createSuggestedRewrite(text, matches) {
@@ -196,19 +306,16 @@ async function analyzeWithOllama(text) {
         {
           role: "system",
           content:
-            "Analyze the user's message for negative or harmful language, including " +
-            "insults, hostility, threats, profanity, self-harm encouragement, and " +
-            "negative self-talk. Identify only the negative word or shortest negative " +
-            "phrase—not the whole sentence. Exclude subjects, pronouns, articles, and " +
-            "linking verbs when they are not themselves negative. Copy that minimal phrase " +
-            "exactly from the message. The replacement must fit in the same location, use " +
-            "at most six words, contain no sentence-ending punctuation, and never be a " +
-            "paragraph or complete rewritten message. Keep the explanation under 15 words. " +
-            "Example: for 'I am dumb', return phrase 'dumb' and replacement 'still learning'. " +
-            "Example: for 'You are an idiot', return phrase 'idiot' and replacement " +
-            "'person who made a mistake'. " +
-            "Do not flag neutral disagreement, quoted language used for discussion, or " +
-            "supportive statements. Return only the requested JSON."
+            "Find every negative or harmful word or shortest phrase in the message. " +
+            "Scan left to right and return one match per negative term; never stop after " +
+            "the first. Copy each phrase exactly, excluding neutral words such as pronouns " +
+            "and linking verbs. Suggest a replacement fragment of at most six words with no " +
+            "sentence punctuation. Use a general positive description and never invent facts, " +
+            "conditions, body details, personal traits, or specific topics that are not in the " +
+            "message. Return only a fragment, without adding a subject such as 'I am'. For " +
+            "'I am stupid and ugly', return separate matches with 'stupid' replaced by " +
+            "'still learning' and 'ugly' replaced by 'unique'. Do not flag neutral or " +
+            "supportive language. Return only JSON."
         },
         { role: "user", content: originalText }
       ]
@@ -220,8 +327,18 @@ async function analyzeWithOllama(text) {
   }
 
   const payload = await response.json();
-  const parsed = JSON.parse(payload.message.content);
-  const matches = validateMatches(originalText, parsed.matches);
+  let parsed;
+  try {
+    parsed = JSON.parse(payload.message.content);
+  } catch {
+    // The small model can occasionally truncate structured output. Continue
+    // with reliable local fallbacks instead of showing an unusable paragraph.
+    parsed = { matches: [] };
+  }
+  const matches = addReliableFallbackMatches(
+    originalText,
+    validateMatches(originalText, parsed.matches)
+  );
 
   return {
     detected: matches.length > 0,
