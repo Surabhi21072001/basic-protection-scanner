@@ -3,8 +3,8 @@
 Sensitive Content Detector is a Chrome Extension prototype built with Manifest
 V3. It has two demonstration surfaces:
 
-- **Interactive Analyzer** — users test a message and review local rule-based
-  phrase matches before sending it.
+- **Interactive Analyzer** — users submit a message to a local Ollama model,
+  review negative phrases, and see short replacement suggestions.
 - **Browser Protection** — the extension scans eligible text on the current
   webpage, marks supported phrases, and lets users reveal the original or view
   a prototype alternative.
@@ -28,8 +28,12 @@ basic-protection-scanner/
 ├── test-page.html         # Standalone analyzer and browser-protection demo
 ├── demo.js                # Analyzer and preview UI behavior
 ├── demo.css               # Demo page styles
+├── package.json           # Test commands and development dependencies
 ├── tests/
-│   └── detector.test.js   # Dependency-free detector regression suite
+│   ├── detector.test.js           # Rule detector regressions
+│   ├── ollama.test.js             # Ollama adapter unit tests
+│   ├── ollama.integration.test.js # Optional live-model test
+│   └── content-dom.test.js        # Browser protection DOM tests
 └── README.md
 ```
 
@@ -94,45 +98,109 @@ negation, quotation, reported speech, sarcasm, intent, or full conversational
 context. Its categories and severity are rule metadata. The analyzer's Ollama
 results are contextual AI suggestions and may still be inaccurate.
 
-## Run the AI analyzer
+## First-time setup
 
-1. Install [Ollama](https://ollama.com/download).
-2. Download the local model:
+### 1. Open the project folder
+
+Open a terminal in the `basic-protection-scanner` folder. If needed, navigate
+to it with:
+
+```sh
+cd /path/to/basic-protection-scanner
+```
+
+The folder should contain `manifest.json`, `test-page.html`, and `ollama.js`.
+
+### 2. Install and start Ollama
+
+On macOS with Homebrew:
+
+```sh
+brew install ollama
+brew services start ollama
+```
+
+You can also install the app from [ollama.com/download](https://ollama.com/download).
+
+Download the model once:
 
 ```sh
 ollama pull llama3.2:1b
 ```
 
-3. Start Ollama if it is not already running:
+Confirm that it is installed:
 
 ```sh
-ollama serve
+ollama list
 ```
 
-4. From this repository, serve the demo over localhost:
+You should see `llama3.2:1b`. When Ollama is running as a Homebrew service, do
+not also run `ollama serve`. An `address already in use` message usually means
+Ollama is already running.
+
+### 3. Start the website
+
+From the project folder, run:
 
 ```sh
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-5. Open [http://localhost:8000/test-page.html](http://localhost:8000/test-page.html).
+Keep this terminal open while using the website. Pressing `Ctrl+C` stops the
+website server.
 
-The browser calls only `http://localhost:11434`; submitted analyzer text stays
-on the computer. Opening `test-page.html` directly as a `file://` URL can be
-blocked by browser cross-origin rules, so use the local web server above.
+### 4. Open the correct browser address
+
+Open this exact URL in Chrome:
+
+[http://localhost:8000/test-page.html](http://localhost:8000/test-page.html)
+
+Do not open `test-page.html` directly from Finder, use a `file://` URL, or use
+the terminal's IPv6 address such as `http://[::]:8000`. Those addresses can
+cause Ollama requests to fail with `Failed to fetch`.
+
+The Interactive Analyzer works without installing the Chrome extension. Text
+submitted to the analyzer is sent only to Ollama on this computer.
+
+## Load Browser Protection in Chrome
+
+The extension is needed for the flags that appear directly inside webpage
+content.
+
+1. Open `chrome://extensions` in Chrome.
+2. Turn on **Developer mode** in the top-right corner.
+3. Click **Load unpacked**.
+4. In the file picker, select the entire `basic-protection-scanner` folder.
+   Select the folder itself, not `manifest.json` or another individual file.
+5. Confirm that **Sensitive Content Detector** appears on the extensions page.
+6. Open or refresh
+   [http://localhost:8000/test-page.html](http://localhost:8000/test-page.html).
+
+If you later edit extension files, return to `chrome://extensions`, click the
+extension's reload button, and refresh the webpage.
+
+## Starting it again later
+
+Ollama and `llama3.2:1b` do not need to be reinstalled or downloaded each time.
+Normally, only restart the website server:
+
+```sh
+cd /path/to/basic-protection-scanner
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Then open
+[http://localhost:8000/test-page.html](http://localhost:8000/test-page.html).
+
+If the analyzer says `Failed to fetch`, check that the URL uses `localhost`
+and verify Ollama with:
+
+```sh
+curl http://localhost:11434/api/tags
+```
+
 The page preloads the model in the background, keeps it loaded for 30 minutes
 after each request, and limits generated output to reduce latency.
-
-## Load the extension in Chrome
-
-1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Select **Load unpacked** and choose this repository directory.
-4. To test local files, open the extension's **Details** and enable **Allow
-   access to file URLs**.
-5. Open `test-page.html` in Chrome. The analyzer works as a standalone demo;
-   the injected Browser Protection controls require the extension to be loaded
-   and permitted to run on the page.
 
 ## Run the tests
 
