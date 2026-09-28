@@ -2,7 +2,7 @@
  * demo.js
  * -------
  * Standalone analyzer and protection preview for test-page.html.
- * Detection remains in detector.js; this file only orchestrates the demo UI.
+ * Submitted text is analyzed by the local Ollama adapter in ollama.js.
  */
 
 const analyzerForm = document.getElementById("analyzer-form");
@@ -23,6 +23,7 @@ const previewWithoutButton = document.getElementById("preview-without-button");
 const previewWithButton = document.getElementById("preview-with-button");
 const guidedSteps = document.querySelectorAll("[data-guided-step]");
 let currentAnalysis = null;
+let analysisRequestId = 0;
 
 function updateInputCount() {
   inputCount.textContent = analyzerInput.value.length + " / 500";
@@ -122,6 +123,38 @@ function showCleanState() {
   resultPreview.hidden = true;
 }
 
+function showLoadingState() {
+  resultTitle.textContent = "Analyzing with local AI…";
+  resultBadge.textContent = "Ollama";
+  resultBadge.className = "result-badge result-badge-neutral";
+  resultPlaceholder.replaceChildren();
+  const message = document.createElement("p");
+  message.textContent = "The first request may take longer while the model loads.";
+  resultPlaceholder.appendChild(message);
+  resultPlaceholder.hidden = false;
+  resultPreview.hidden = true;
+  protectionPreview.hidden = true;
+  analyzeButton.disabled = true;
+  analyzeButton.textContent = "Analyzing…";
+}
+
+function showAnalysisError(error) {
+  resultTitle.textContent = "Local AI unavailable";
+  resultBadge.textContent = "Connection error";
+  resultBadge.className = "result-badge result-badge-warning";
+  resultPlaceholder.replaceChildren();
+  const message = document.createElement("p");
+  const model = window.ProtectionScanner &&
+    window.ProtectionScanner.OLLAMA_MODEL || "configured model";
+  message.textContent =
+    "Start Ollama and make sure the " + model + " model is installed. " +
+    (error && error.message ? error.message : "");
+  resultPlaceholder.appendChild(message);
+  resultPlaceholder.hidden = false;
+  resultPreview.hidden = true;
+  protectionPreview.hidden = true;
+}
+
 function showDetectedState(text, detectionResult) {
   resultTitle.textContent = "Potentially harmful phrase detected";
   resultBadge.textContent = detectionResult.matches.length + " match" +
@@ -155,11 +188,11 @@ function showDetectedState(text, detectionResult) {
 
     const why = document.createElement("span");
     why.className = "result-match-metadata";
-    why.textContent = getRuleExplanation(match.category);
+    why.textContent = match.explanation || getRuleExplanation(match.category);
 
     const alternative = document.createElement("span");
     alternative.className = "result-match-alternative";
-    alternative.textContent = "Prototype safer alternative: " + getDemoAlternative(match);
+    alternative.textContent = "AI safer alternative: " + getDemoAlternative(match);
 
     const actions = document.createElement("span");
     actions.className = "result-match-actions";
@@ -176,6 +209,8 @@ function showDetectedState(text, detectionResult) {
 }
 
 function getDemoAlternative(match) {
+  if (match.replacement) return match.replacement;
+
   const alternatives = {
     insult: "unkind person",
     profanity: "inappropriate language",
@@ -234,7 +269,7 @@ function showProtectionPreview(text, detectionResult) {
   renderProtectionPreview("without");
 }
 
-function analyzeText() {
+async function analyzeText() {
   const text = analyzerInput.value;
   if (!text.trim()) {
     currentAnalysis = null;
@@ -245,14 +280,14 @@ function analyzeText() {
   }
 
   const detect = window.ProtectionScanner &&
-    window.ProtectionScanner.detectHarmfulLanguage;
+    window.ProtectionScanner.analyzeWithOllama;
   if (typeof detect !== "function") {
     resultTitle.textContent = "Analyzer unavailable";
     resultBadge.textContent = "Setup error";
     resultBadge.className = "result-badge result-badge-warning";
     resultPlaceholder.replaceChildren();
     const message = document.createElement("p");
-    message.textContent = "The local detector could not be loaded.";
+    message.textContent = "The Ollama analyzer could not be loaded.";
     resultPlaceholder.appendChild(message);
     resultPlaceholder.hidden = false;
     resultPreview.hidden = true;
@@ -260,17 +295,34 @@ function analyzeText() {
     return;
   }
 
-  const detectionResult = detect(text);
-  setGuidedStep("review");
-  if (detectionResult.detected) {
-    showDetectedState(text, detectionResult);
-  } else {
-    showCleanState();
+  const requestId = ++analysisRequestId;
+  showLoadingState();
+
+  try {
+    const detectionResult = await detect(text);
+    if (requestId !== analysisRequestId) return;
+
+    setGuidedStep("review");
+    if (detectionResult.detected) {
+      showDetectedState(text, detectionResult);
+    } else {
+      showCleanState();
+    }
+    showProtectionPreview(text, detectionResult);
+  } catch (error) {
+    if (requestId !== analysisRequestId) return;
+    currentAnalysis = null;
+    showAnalysisError(error);
+  } finally {
+    if (requestId === analysisRequestId) {
+      analyzeButton.disabled = false;
+      analyzeButton.textContent = "Analyze text";
+    }
   }
-  showProtectionPreview(text, detectionResult);
 }
 
 function handleInputChange() {
+  analysisRequestId++;
   updateInputCount();
   currentAnalysis = null;
   showEmptyState();
@@ -302,3 +354,12 @@ previewWithoutButton.addEventListener("click", () => renderProtectionPreview("wi
 previewWithButton.addEventListener("click", () => renderProtectionPreview("with"));
 
 handleInputChange();
+
+const preloadModel = window.ProtectionScanner &&
+  window.ProtectionScanner.preloadOllamaModel;
+if (typeof preloadModel === "function") {
+  // Warm the model in the background so the first submitted analysis is faster.
+  preloadModel().catch(() => {
+    // Submission displays an actionable error if Ollama is unavailable.
+  });
+}
