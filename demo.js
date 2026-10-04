@@ -2,7 +2,7 @@
  * demo.js
  * -------
  * Standalone analyzer and protection preview for test-page.html.
- * Submitted text is analyzed by the local Ollama adapter in ollama.js.
+ * Submitted text uses the local Ollama adapter, with local rules as fallback.
  */
 
 const analyzerForm = document.getElementById("analyzer-form");
@@ -13,6 +13,7 @@ const inputCount = document.getElementById("input-count");
 const resultTitle = document.getElementById("result-title");
 const resultBadge = document.getElementById("result-badge");
 const resultSource = document.getElementById("result-source");
+const exampleStatus = document.getElementById("example-status");
 const resultPlaceholder = document.getElementById("result-placeholder");
 const resultPreview = document.getElementById("result-preview");
 const resultText = document.getElementById("result-text");
@@ -22,6 +23,9 @@ const previewWithout = document.getElementById("preview-without");
 const previewWith = document.getElementById("preview-with");
 const previewWithoutButton = document.getElementById("preview-without-button");
 const previewWithButton = document.getElementById("preview-with-button");
+const heroPreviewPhrase = document.getElementById("hero-preview-phrase");
+const heroOriginalButton = document.getElementById("hero-original-button");
+const heroAlternativeButton = document.getElementById("hero-alternative-button");
 const guidedSteps = document.querySelectorAll("[data-guided-step]");
 let currentAnalysis = null;
 let analysisRequestId = 0;
@@ -40,7 +44,9 @@ function setAnalyzerState(state) {
     throw new Error("Invalid analyzer state.");
   }
   analyzerState = state;
-  document.getElementById("analyzer-result").dataset.state = analyzerState;
+  const resultCard = document.getElementById("analyzer-result");
+  resultCard.dataset.state = analyzerState;
+  resultCard.setAttribute("aria-busy", String(state === "LOADING"));
 }
 
 function setResultSource(detectionResult) {
@@ -117,7 +123,7 @@ function createProtectedPreview(text, matches) {
     icon.setAttribute("aria-hidden", "true");
     icon.textContent = "!";
     const label = document.createElement("span");
-    label.textContent = "Potentially harmful phrase";
+    label.textContent = "Flagged";
     protectedLabel.append(icon, label);
     fragment.appendChild(protectedLabel);
     cursor = match.endIndex;
@@ -128,39 +134,45 @@ function createProtectedPreview(text, matches) {
 }
 
 function setGuidedStep(activeStep) {
-  guidedSteps.forEach((step) => {
+  const orderedSteps = Array.from(guidedSteps);
+  const activeIndex = orderedSteps.findIndex((step) => step.dataset.guidedStep === activeStep);
+  orderedSteps.forEach((step, index) => {
     if (step.dataset.guidedStep === activeStep) {
       step.setAttribute("aria-current", "step");
     } else {
       step.removeAttribute("aria-current");
     }
+    step.classList.toggle("is-complete", index < activeIndex);
   });
 }
 
 function showEmptyState(state = "IDLE") {
   setAnalyzerState(state);
   setResultSource(null);
-  resultTitle.textContent = "Enter text to analyze";
-  resultBadge.textContent = "Waiting for input";
+  resultTitle.textContent = state === "CLEAR" ? "Cleared" : "Analysis";
+  resultBadge.textContent = state === "CLEAR" ? "Cleared" : "Ready";
   resultBadge.className = "result-badge result-badge-neutral";
   resultPlaceholder.replaceChildren();
   const icon = document.createElement("div");
   icon.className = "result-placeholder-icon";
   icon.setAttribute("aria-hidden", "true");
-  icon.textContent = "↗";
+  icon.textContent = "✦";
   const message = document.createElement("p");
-  message.textContent = "Choose an example or enter text to see what the scanner notices.";
+  message.textContent = state === "CLEAR"
+    ? "Message and results cleared."
+    : "Your result will appear here.";
   resultPlaceholder.append(icon, message);
   resultPlaceholder.hidden = false;
   resultPreview.hidden = true;
   protectionPreview.hidden = true;
+  setGuidedStep("review");
 }
 
 function showCleanState(detectionResult) {
   setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
   setResultSource(detectionResult);
-  resultTitle.textContent = "No potentially harmful language detected";
-  resultBadge.textContent = "No phrases flagged";
+  resultTitle.textContent = "No flags";
+  resultBadge.textContent = "Clean";
   resultBadge.className = "result-badge result-badge-safe";
   resultPlaceholder.hidden = false;
   resultPlaceholder.replaceChildren();
@@ -169,7 +181,7 @@ function showCleanState(detectionResult) {
   indicator.setAttribute("aria-hidden", "true");
   indicator.textContent = "✓";
   const message = document.createElement("p");
-  message.textContent = "No potentially harmful language was detected in this message.";
+  message.textContent = "No phrases flagged.";
   resultPlaceholder.append(indicator, message);
   resultPreview.hidden = true;
 }
@@ -178,12 +190,12 @@ function showLoadingState() {
   setAnalyzerState("LOADING");
   resultSource.textContent = "Local AI analysis";
   resultSource.hidden = false;
-  resultTitle.textContent = "Analyzing with local AI…";
-  resultBadge.textContent = "Ollama";
+  resultTitle.textContent = "Analyzing…";
+  resultBadge.textContent = "Working";
   resultBadge.className = "result-badge result-badge-neutral";
   resultPlaceholder.replaceChildren();
   const message = document.createElement("p");
-  message.textContent = "The first request may take longer while the model loads.";
+  message.textContent = "This may take a moment.";
   resultPlaceholder.appendChild(message);
   resultPlaceholder.hidden = false;
   resultPreview.hidden = true;
@@ -195,12 +207,12 @@ function showLoadingState() {
 function showAnalysisError() {
   setAnalyzerState("ERROR");
   setResultSource(null);
-  resultTitle.textContent = "Analyzer unavailable";
-  resultBadge.textContent = "Setup error";
+  resultTitle.textContent = "Unavailable";
+  resultBadge.textContent = "Error";
   resultBadge.className = "result-badge result-badge-warning";
   resultPlaceholder.replaceChildren();
   const message = document.createElement("p");
-  message.textContent = "The analyzer could not start. Reload the demo page and try again.";
+  message.textContent = "Reload the page and try again.";
   resultPlaceholder.appendChild(message);
   resultPlaceholder.hidden = false;
   resultPreview.hidden = true;
@@ -210,9 +222,9 @@ function showAnalysisError() {
 function showDetectedState(text, detectionResult) {
   setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
   setResultSource(detectionResult);
-  resultTitle.textContent = "Potentially harmful phrase detected";
-  resultBadge.textContent = detectionResult.matches.length + " match" +
-    (detectionResult.matches.length === 1 ? "" : "es");
+  resultTitle.textContent = "Phrase flagged";
+  resultBadge.textContent = detectionResult.matches.length + " flag" +
+    (detectionResult.matches.length === 1 ? "" : "s");
   resultBadge.className = "result-badge result-badge-warning";
   resultPlaceholder.hidden = true;
   resultPlaceholder.replaceChildren();
@@ -228,6 +240,10 @@ function showDetectedState(text, detectionResult) {
     const phrase = document.createElement("strong");
     phrase.className = "result-match-phrase";
     phrase.textContent = match.phrase;
+
+    const phraseLabel = document.createElement("span");
+    phraseLabel.className = "result-match-label";
+    phraseLabel.textContent = "Flagged phrase";
 
     const category = document.createElement("span");
     category.className = "result-match-metadata";
@@ -247,20 +263,11 @@ function showDetectedState(text, detectionResult) {
 
     const alternative = document.createElement("span");
     alternative.className = "result-match-alternative";
-    alternative.textContent = "Prototype safer alternative: " + getDemoAlternative(match);
+    alternative.textContent = "Alternative: " + getDemoAlternative(match);
 
-    const actions = document.createElement("span");
-    actions.className = "result-match-actions";
-    actions.textContent = "In Browser Protection, you can show or hide the original, or view the prototype alternative.";
-
-    detail.append(phrase, category, severity, whyTitle, why, alternative, actions);
+    detail.append(phraseLabel, phrase, category, severity, whyTitle, why, alternative);
     resultDetail.appendChild(detail);
   });
-
-  const note = document.createElement("span");
-  note.className = "detail-note";
-  note.textContent = "Surrounding context remains readable.";
-  resultDetail.appendChild(note);
 }
 
 function getDemoAlternative(match) {
@@ -282,9 +289,9 @@ function getCategoryLabel(category) {
 
 function getSeverityLabel(severity) {
   const labels = {
-    low: "Low — phrase-level flag",
-    medium: "Medium — phrase-level flag",
-    high: "High — phrase-level flag"
+    low: "Low",
+    medium: "Medium",
+    high: "High"
   };
   return labels[severity] || "Unrated prototype rule";
 }
@@ -316,7 +323,7 @@ function showProtectionPreview(text, detectionResult) {
     previewWith.appendChild(document.createTextNode(text));
     const note = document.createElement("span");
     note.className = "preview-no-matches";
-    note.textContent = "No phrases were flagged; the preview is unchanged.";
+    note.textContent = "No changes.";
     previewWith.appendChild(note);
   }
 
@@ -335,7 +342,9 @@ async function analyzeText() {
   }
 
   const requestId = ++analysisRequestId;
+  exampleStatus.hidden = true;
   showLoadingState();
+  setGuidedStep("analyze");
 
   try {
     const scanner = window.ProtectionScanner;
@@ -364,19 +373,32 @@ async function analyzeText() {
   } finally {
     if (requestId === analysisRequestId) {
       analyzeButton.disabled = false;
-      analyzeButton.textContent = "Analyze text";
+      analyzeButton.textContent = "Analyze";
     }
   }
 }
 
-function handleInputChange(state = "IDLE") {
+function handleInputChange(state = "IDLE", selectedExample = null) {
   analysisRequestId++;
   updateInputCount();
   currentAnalysis = null;
   showEmptyState(state);
   analyzeButton.disabled = false;
-  analyzeButton.textContent = "Analyze text";
+  analyzeButton.textContent = "Analyze";
   setGuidedStep(analyzerInput.value.trim() ? "analyze" : "enter");
+
+  document.querySelectorAll("[data-example]").forEach((button) => {
+    const selected = button === selectedExample;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  if (selectedExample) {
+    exampleStatus.textContent = "Scenario loaded. Ready to analyze.";
+    exampleStatus.hidden = false;
+  } else {
+    exampleStatus.textContent = "";
+    exampleStatus.hidden = true;
+  }
 }
 
 analyzerInput.addEventListener("input", () => handleInputChange());
@@ -395,13 +417,25 @@ clearButton.addEventListener("click", () => {
 document.querySelectorAll("[data-example]").forEach((button) => {
   button.addEventListener("click", () => {
     analyzerInput.value = button.dataset.example;
-    handleInputChange();
-    analyzerInput.focus();
+    handleInputChange("IDLE", button);
+    analyzeButton.focus();
   });
 });
 
 previewWithoutButton.addEventListener("click", () => renderProtectionPreview("without"));
 previewWithButton.addEventListener("click", () => renderProtectionPreview("with"));
+
+function setHeroPreviewMode(mode) {
+  const showOriginal = mode === "original";
+  heroPreviewPhrase.textContent = showOriginal ? "idiot" : "unkind person";
+  heroPreviewPhrase.classList.toggle("preview-mark", showOriginal);
+  heroPreviewPhrase.classList.toggle("preview-alternative-text", !showOriginal);
+  heroOriginalButton.setAttribute("aria-pressed", String(showOriginal));
+  heroAlternativeButton.setAttribute("aria-pressed", String(!showOriginal));
+}
+
+heroOriginalButton.addEventListener("click", () => setHeroPreviewMode("original"));
+heroAlternativeButton.addEventListener("click", () => setHeroPreviewMode("alternative"));
 
 handleInputChange();
 

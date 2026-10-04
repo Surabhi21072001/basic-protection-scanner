@@ -322,7 +322,7 @@ function flagMatches(textNodes, matches) {
 
 /**
  * Scan eligible elements in the document once.
- * Returns a summary object: { scannedCount, matches: [...] }
+ * Returns a summary object: { scannedCount, harmfulCount }.
  */
 function scanPage() {
   const elements = document.querySelectorAll(READABLE_SELECTORS.join(","));
