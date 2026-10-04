@@ -240,7 +240,7 @@ npm run test:llm
 The live capability test is opt-in because it loads the model and takes longer
 than the deterministic regression suite.
 
-## Known limitations and possible follow-up work
+## Known limitations  
 
 - Add dynamic-content rescanning if the product requires support for
   single-page applications and infinite-scroll pages.
@@ -248,5 +248,3 @@ than the deterministic regression suite.
   offsets back to DOM nodes.
 - The local model can misunderstand context and its classifications and
   replacements should be treated as suggestions.
-- Automatic Browser Protection remains rule-based. Only text explicitly
-  submitted through the analyzer is sent to the local Ollama service.
