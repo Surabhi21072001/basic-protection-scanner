@@ -708,6 +708,13 @@ h3 {
   padding: var(--space-3);
 }
 
+.result-source {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  margin: var(--space-1) 0 0;
+}
+
 .result-match-card[data-severity="high"] {
   background: #fff0ee;
   border-color: #e4aaa3;

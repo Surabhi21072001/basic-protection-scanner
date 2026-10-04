@@ -12,6 +12,7 @@ const clearButton = document.getElementById("clear-button");
 const inputCount = document.getElementById("input-count");
 const resultTitle = document.getElementById("result-title");
 const resultBadge = document.getElementById("result-badge");
+const resultSource = document.getElementById("result-source");
 const resultPlaceholder = document.getElementById("result-placeholder");
 const resultPreview = document.getElementById("result-preview");
 const resultText = document.getElementById("result-text");
@@ -24,6 +25,52 @@ const previewWithButton = document.getElementById("preview-with-button");
 const guidedSteps = document.querySelectorAll("[data-guided-step]");
 let currentAnalysis = null;
 let analysisRequestId = 0;
+const ANALYZER_STATES = new Set([
+  "IDLE",
+  "LOADING",
+  "AI_RESULT",
+  "RULE_RESULT",
+  "CLEAR",
+  "ERROR"
+]);
+let analyzerState = "IDLE";
+
+function setAnalyzerState(state) {
+  if (!ANALYZER_STATES.has(state)) {
+    throw new Error("Invalid analyzer state.");
+  }
+  analyzerState = state;
+  document.getElementById("analyzer-result").dataset.state = analyzerState;
+}
+
+function setResultSource(detectionResult) {
+  if (!detectionResult || !detectionResult.source) {
+    resultSource.textContent = "";
+    resultSource.hidden = true;
+    return;
+  }
+
+  if (detectionResult.source === "rules") {
+    resultSource.textContent = detectionResult.fallbackReason
+      ? "Rule-based fallback · " + getFallbackReasonLabel(detectionResult.fallbackReason)
+      : "Rule-based analysis";
+  } else {
+    resultSource.textContent = "Local AI analysis";
+  }
+  resultSource.hidden = false;
+}
+
+function getFallbackReasonLabel(reason) {
+  const reasons = {
+    unreachable: "Ollama is not reachable",
+    "model-missing": "the configured model is not installed",
+    "invalid-response": "Ollama returned an invalid response",
+    "parse-failure": "Ollama's response could not be parsed",
+    "validation-failure": "Ollama's response did not pass validation",
+    "request-failure": "Ollama could not complete the request"
+  };
+  return reasons[reason] || reasons["request-failure"];
+}
 
 function updateInputCount() {
   inputCount.textContent = analyzerInput.value.length + " / 500";
@@ -90,7 +137,9 @@ function setGuidedStep(activeStep) {
   });
 }
 
-function showEmptyState() {
+function showEmptyState(state = "IDLE") {
+  setAnalyzerState(state);
+  setResultSource(null);
   resultTitle.textContent = "Enter text to analyze";
   resultBadge.textContent = "Waiting for input";
   resultBadge.className = "result-badge result-badge-neutral";
@@ -107,7 +156,9 @@ function showEmptyState() {
   protectionPreview.hidden = true;
 }
 
-function showCleanState() {
+function showCleanState(detectionResult) {
+  setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
+  setResultSource(detectionResult);
   resultTitle.textContent = "No potentially harmful language detected";
   resultBadge.textContent = "No phrases flagged";
   resultBadge.className = "result-badge result-badge-safe";
@@ -124,6 +175,9 @@ function showCleanState() {
 }
 
 function showLoadingState() {
+  setAnalyzerState("LOADING");
+  resultSource.textContent = "Local AI analysis";
+  resultSource.hidden = false;
   resultTitle.textContent = "Analyzing with local AI…";
   resultBadge.textContent = "Ollama";
   resultBadge.className = "result-badge result-badge-neutral";
@@ -138,17 +192,15 @@ function showLoadingState() {
   analyzeButton.textContent = "Analyzing…";
 }
 
-function showAnalysisError(error) {
-  resultTitle.textContent = "Local AI unavailable";
-  resultBadge.textContent = "Connection error";
+function showAnalysisError() {
+  setAnalyzerState("ERROR");
+  setResultSource(null);
+  resultTitle.textContent = "Analyzer unavailable";
+  resultBadge.textContent = "Setup error";
   resultBadge.className = "result-badge result-badge-warning";
   resultPlaceholder.replaceChildren();
   const message = document.createElement("p");
-  const model = window.ProtectionScanner &&
-    window.ProtectionScanner.OLLAMA_MODEL || "configured model";
-  message.textContent =
-    "Start Ollama and make sure the " + model + " model is installed. " +
-    (error && error.message ? error.message : "");
+  message.textContent = "The analyzer could not start. Reload the demo page and try again.";
   resultPlaceholder.appendChild(message);
   resultPlaceholder.hidden = false;
   resultPreview.hidden = true;
@@ -156,11 +208,14 @@ function showAnalysisError(error) {
 }
 
 function showDetectedState(text, detectionResult) {
+  setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
+  setResultSource(detectionResult);
   resultTitle.textContent = "Potentially harmful phrase detected";
   resultBadge.textContent = detectionResult.matches.length + " match" +
     (detectionResult.matches.length === 1 ? "" : "es");
   resultBadge.className = "result-badge result-badge-warning";
   resultPlaceholder.hidden = true;
+  resultPlaceholder.replaceChildren();
   resultPreview.hidden = false;
   resultText.replaceChildren(createHighlightedText(text, detectionResult.matches));
   resultDetail.replaceChildren();
@@ -192,7 +247,7 @@ function showDetectedState(text, detectionResult) {
 
     const alternative = document.createElement("span");
     alternative.className = "result-match-alternative";
-    alternative.textContent = "AI safer alternative: " + getDemoAlternative(match);
+    alternative.textContent = "Prototype safer alternative: " + getDemoAlternative(match);
 
     const actions = document.createElement("span");
     actions.className = "result-match-actions";
@@ -273,25 +328,9 @@ async function analyzeText() {
   const text = analyzerInput.value;
   if (!text.trim()) {
     currentAnalysis = null;
-    showEmptyState();
+    showEmptyState("IDLE");
     setGuidedStep("enter");
     analyzerInput.focus();
-    return;
-  }
-
-  const detect = window.ProtectionScanner &&
-    window.ProtectionScanner.analyzeWithOllama;
-  if (typeof detect !== "function") {
-    resultTitle.textContent = "Analyzer unavailable";
-    resultBadge.textContent = "Setup error";
-    resultBadge.className = "result-badge result-badge-warning";
-    resultPlaceholder.replaceChildren();
-    const message = document.createElement("p");
-    message.textContent = "The Ollama analyzer could not be loaded.";
-    resultPlaceholder.appendChild(message);
-    resultPlaceholder.hidden = false;
-    resultPreview.hidden = true;
-    protectionPreview.hidden = true;
     return;
   }
 
@@ -299,20 +338,29 @@ async function analyzeText() {
   showLoadingState();
 
   try {
-    const detectionResult = await detect(text);
+    const scanner = window.ProtectionScanner;
+    if (!scanner || (
+      typeof scanner.analyzeText !== "function" &&
+      typeof scanner.analyzeWithRules !== "function"
+    )) {
+      throw new Error("Analyzer unavailable.");
+    }
+    const detectionResult = typeof scanner.analyzeText === "function"
+      ? await scanner.analyzeText(text, "local-ai")
+      : scanner.analyzeWithRules(text);
     if (requestId !== analysisRequestId) return;
 
     setGuidedStep("review");
     if (detectionResult.detected) {
       showDetectedState(text, detectionResult);
     } else {
-      showCleanState();
+      showCleanState(detectionResult);
     }
     showProtectionPreview(text, detectionResult);
   } catch (error) {
     if (requestId !== analysisRequestId) return;
     currentAnalysis = null;
-    showAnalysisError(error);
+    showAnalysisError();
   } finally {
     if (requestId === analysisRequestId) {
       analyzeButton.disabled = false;
@@ -321,15 +369,17 @@ async function analyzeText() {
   }
 }
 
-function handleInputChange() {
+function handleInputChange(state = "IDLE") {
   analysisRequestId++;
   updateInputCount();
   currentAnalysis = null;
-  showEmptyState();
+  showEmptyState(state);
+  analyzeButton.disabled = false;
+  analyzeButton.textContent = "Analyze text";
   setGuidedStep(analyzerInput.value.trim() ? "analyze" : "enter");
 }
 
-analyzerInput.addEventListener("input", handleInputChange);
+analyzerInput.addEventListener("input", () => handleInputChange());
 
 analyzerForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -338,7 +388,7 @@ analyzerForm.addEventListener("submit", (event) => {
 
 clearButton.addEventListener("click", () => {
   analyzerInput.value = "";
-  handleInputChange();
+  handleInputChange("CLEAR");
   analyzerInput.focus();
 });
 

@@ -93,7 +93,7 @@
       <div class="analyzer-layout">
         <form class="analyzer-form card" id="analyzer-form" novalidate>
           <label for="analyzer-input">Your message</label>
-          <textarea id="analyzer-input" name="analyzer-input" rows="6" placeholder="Write a sentence or choose an example below..."></textarea>
+          <textarea id="analyzer-input" name="analyzer-input" rows="6" maxlength="500" placeholder="Write a sentence or choose an example below..."></textarea>
           <div class="input-meta">
             <span>Local Ollama model · text stays on your computer</span>
             <span id="input-count">0 / 500</span>
@@ -127,6 +127,7 @@
             <div>
               <p class="eyebrow">DETECTION RESULT</p>
               <h3 id="result-title">Your result will appear here</h3>
+              <p class="result-source" id="result-source" hidden></p>
             </div>
             <span class="result-badge result-badge-neutral" id="result-badge">Waiting for input</span>
           </div>
@@ -162,7 +163,7 @@
       </section>
       <aside class="local-prototype-note" aria-label="Prototype limitations and privacy">
         <strong>Local AI prototype</strong>
-        <span>Submitted analyzer text is sent only to Ollama running on this computer. It is not sent to a cloud service. AI results may be inaccurate.</span>
+        <span>Submitted analyzer text is sent only to Ollama on this computer. If Ollama is unavailable, the analyzer uses local phrase rules. Webpage text is never sent to Ollama. AI can be inaccurate; rule fallback may not understand negation, quotation, reported speech, sarcasm, or intent.</span>
       </aside>
     </section>
 

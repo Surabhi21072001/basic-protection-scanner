@@ -33,7 +33,8 @@ basic-protection-scanner/
 │   ├── detector.test.js           # Rule detector regressions
 │   ├── ollama.test.js             # Ollama adapter unit tests
 │   ├── ollama.integration.test.js # Optional live-model test
-│   └── content-dom.test.js        # Browser protection DOM tests
+│   ├── content-dom.test.js        # Browser protection DOM tests
+│   └── demo.test.js               # Analyzer state and fallback UI tests
 └── README.md
 ```
 
@@ -68,11 +69,12 @@ basic-protection-scanner/
   allow the content script to run.
 - **`test-page.html`, `ollama.js`, `demo.js`, and `demo.css`** provide a
   standalone demo. The analyzer sends explicitly submitted text to a local
-  `llama3.2:1b` model and validates that returned phrases exist in the original
-  message before highlighting them. Its Protection Preview uses the model's
-  matches and offsets. The discussion thread is ordinary
-  page markup intended to demonstrate the extension's injected controls when
-  the extension is installed and enabled for that page.
+  `llama3.2:1b` model and validates its schema, category, severity, phrase,
+  source offsets, and overlaps before rendering. A validation or connection
+  failure falls back to the deterministic detector. Its Protection Preview
+  uses whichever engine's validated result is active. The discussion thread is
+  ordinary page markup intended to demonstrate the extension's injected
+  controls when the extension is installed and enabled for that page.
 
 The detector returns a DOM-independent result shaped like:
 
@@ -95,8 +97,14 @@ The detector returns a DOM-independent result shaped like:
 
 The rule-based detector used for automatic webpage scanning does not interpret
 negation, quotation, reported speech, sarcasm, intent, or full conversational
-context. Its categories and severity are rule metadata. The analyzer's Ollama
-results are contextual AI suggestions and may still be inaccurate.
+context. Its categories and severity are rule metadata. The Interactive
+Analyzer's Ollama results use the same category and severity vocabulary, with
+specific local threat and self-harm rules taking precedence over generic AI
+categories. The rule fallback applies a narrow first-person versus
+second-person self-talk distinction but otherwise retains the detector's
+context limitations. AI results may still be inaccurate; if Ollama is
+unavailable or returns invalid output, analyzer submissions fall back to local
+rules.
 
 ## First-time setup
 
@@ -212,8 +220,9 @@ npm test
 ```
 
 The suite covers detector offsets, multiple and repeated matches, boundaries,
-normalization, Ollama response validation, DOM control states, scan totals, and
-duplicate-marker prevention.
+normalization, Ollama response validation, negative-self-talk distinctions,
+high-risk category precedence, fallback/error states, DOM control states, scan
+totals, and duplicate-marker prevention.
 
 To also test the live local model, make sure Ollama is running and execute:
 

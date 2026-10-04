@@ -8,6 +8,10 @@ const detectorSource = fs.readFileSync(
   path.join(__dirname, "..", "detector.js"),
   "utf8"
 );
+const manifest = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "..", "manifest.json"),
+  "utf8"
+));
 const contentSource = fs.readFileSync(
   path.join(__dirname, "..", "content.js"),
   "utf8"
@@ -136,6 +140,35 @@ test("flag controls move through protected, open, original, and safer states", (
   assert.equal(saferButton.getAttribute("aria-pressed"), "true");
 });
 
+test("Browser Protection explains its local rule and prototype controls", () => {
+  const page = createScannedPage('<p>You are stupid.</p>');
+  const marker = page.document.querySelector("[data-bps-flag]");
+  const panel = marker.querySelector(".bps-flag-panel");
+
+  assert.match(panel.textContent, /Category: Insult/);
+  assert.match(panel.textContent, /Prototype severity: Low/);
+  assert.match(panel.textContent, /Why was this phrase flagged\?/);
+  assert.match(panel.textContent, /matches a local rule categorized as insult/);
+  assert.match(panel.textContent, /Prototype safer alternative:/);
+  assert.equal(panel.querySelector("[data-bps-action='original']").textContent, "Show original");
+  assert.equal(
+    panel.querySelector("[data-bps-action='safer']").textContent,
+    "View safer alternative"
+  );
+});
+
+test("high-risk Browser Protection alternatives align with current rule categories", () => {
+  const page = createScannedPage("<p>I will hurt you.</p>");
+  const marker = page.document.querySelector("[data-bps-flag]");
+  const panel = marker.querySelector(".bps-flag-panel");
+  panel.querySelector("[data-bps-action='safer']").click();
+
+  assert.match(
+    marker.querySelector("[data-bps-safer]").textContent,
+    /non-threatening statement/
+  );
+});
+
 test("rescanning does not duplicate markers or original phrase nodes", () => {
   const page = createScannedPage('<p id="message">You are an idiot.</p>');
 
@@ -160,4 +193,11 @@ test("popup summary reports the initial DOM scan totals", () => {
   assert.equal(summary.scannedCount, 2);
   assert.equal(summary.harmfulCount, 2);
   assert.equal(typeof summary.updatedAt, "number");
+});
+
+test("automatic webpage scanning does not load the Ollama analyzer", () => {
+  assert.deepEqual(
+    manifest.content_scripts[0].js,
+    ["detector.js", "content.js"]
+  );
 });

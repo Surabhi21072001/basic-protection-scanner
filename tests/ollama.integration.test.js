@@ -9,12 +9,17 @@ const ollamaSource = fs.readFileSync(
   path.join(__dirname, "..", "ollama.js"),
   "utf8"
 );
+const detectorSource = fs.readFileSync(
+  path.join(__dirname, "..", "detector.js"),
+  "utf8"
+);
 const analyzerWindow = {};
 const context = vm.createContext({
   window: analyzerWindow,
   fetch
 });
 
+vm.runInContext(detectorSource, context);
 vm.runInContext(ollamaSource, context);
 
 test(

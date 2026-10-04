@@ -102,11 +102,32 @@ function getSaferVersion(match) {
     return "inappropriate language";
   }
 
-  if (match.category === "harassment/threat") {
+  if (match.category === "threat") {
     return "a non-threatening statement";
   }
 
+  if (match.category === "self-harm encouragement") {
+    return "a supportive message";
+  }
+
+  if (match.category === "negative self-talk") {
+    return "still learning";
+  }
+
   return "a more constructive phrase";
+}
+
+function getCategoryLabel(category) {
+  return category.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getSeverityLabel(severity) {
+  const labels = {
+    low: "Low",
+    medium: "Medium",
+    high: "High"
+  };
+  return labels[severity] || "Unrated";
 }
 
 function setFlagState(marker, state) {
@@ -171,11 +192,17 @@ function addFlagControls(marker, match, originalNode) {
 
   const summary = document.createElement("span");
   summary.className = "bps-flag-summary";
-  summary.textContent = match.category + " · " + match.severity + " severity";
+  summary.textContent = "Category: " + getCategoryLabel(match.category) +
+    " · Prototype severity: " + getSeverityLabel(match.severity);
+
+  const whyTitle = document.createElement("strong");
+  whyTitle.className = "bps-flag-summary";
+  whyTitle.textContent = "Why was this phrase flagged?";
 
   const description = document.createElement("span");
   description.className = "bps-flag-description";
-  description.textContent = "The original phrase is hidden. Choose how to view it.";
+  description.textContent = "This phrase matches a local rule categorized as " +
+    match.category + ".";
 
   const originalDetail = document.createElement("span");
   originalDetail.className = "bps-flag-detail";
@@ -212,7 +239,7 @@ function addFlagControls(marker, match, originalNode) {
   closeButton.textContent = "×";
 
   controls.append(showOriginalButton, saferButton, closeButton);
-  panel.append(summary, description, originalDetail, saferDetail, controls);
+  panel.append(summary, whyTitle, description, originalDetail, saferDetail, controls);
   marker.replaceChildren(original, safer, trigger, panel);
   trigger.addEventListener("click", () => {
     setFlagOpen(marker, marker.dataset.bpsOpen !== "true");

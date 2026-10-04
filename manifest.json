@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Sensitive Content Detector",
   "version": "1.0.0",
-  "description": "Local rule-based prototype that detects potentially harmful phrases on webpages and gives users review controls.",
+  "description": "Local AI message analysis and rule-based webpage protection with user-controlled phrase review.",
 
   "action": {
     "default_title": "Sensitive Content Detector",
