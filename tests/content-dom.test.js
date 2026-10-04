@@ -140,16 +140,16 @@ test("flag controls move through protected, open, original, and safer states", (
   assert.equal(saferButton.getAttribute("aria-pressed"), "true");
 });
 
-test("Browser Protection explains its local rule and prototype controls", () => {
+test("Browser Protection presents phrase details in product language", () => {
   const page = createScannedPage('<p>You are stupid.</p>');
   const marker = page.document.querySelector("[data-bps-flag]");
   const panel = marker.querySelector(".bps-flag-panel");
 
   assert.match(panel.textContent, /Category: Insult/);
-  assert.match(panel.textContent, /Prototype severity: Low/);
-  assert.match(panel.textContent, /Why was this phrase flagged\?/);
-  assert.match(panel.textContent, /matches a local rule categorized as insult/);
-  assert.match(panel.textContent, /Prototype safer alternative:/);
+  assert.match(panel.textContent, /Severity: Low/);
+  assert.match(panel.textContent, /Why this may be harmful/);
+  assert.match(panel.textContent, /may come across as a personal attack/);
+  assert.match(panel.textContent, /Suggested alternative:/);
   assert.equal(panel.querySelector("[data-bps-action='original']").textContent, "Show original");
   assert.equal(
     panel.querySelector("[data-bps-action='safer']").textContent,

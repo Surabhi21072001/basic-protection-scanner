@@ -17,14 +17,14 @@
   <main id="top">
     <section class="hero page-shell" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow">BASIC PROTECTION</p>
-        <h1 id="hero-title">See harmful language.<br />Choose what happens next.</h1>
+        <p class="eyebrow">COMMUNICATION SAFETY</p>
+        <h1 id="hero-title">Protect conversations without taking control away.</h1>
         <p class="hero-summary">
-          Review messages before sending and control how harmful phrases appear while you browse.
+          Review a message before sending it, or see how harmful language can be handled while you browse.
         </p>
-        <nav class="hero-actions hero-switcher" aria-label="Choose a demo">
-          <a class="hero-switcher-link" href="#analyzer">Analyzer <span aria-hidden="true">↘</span></a>
-          <a class="hero-switcher-link" href="#live-demo">Browser <span aria-hidden="true">↘</span></a>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#analyzer">Try a message <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href="#live-demo">Explore browser demo <span aria-hidden="true">↘</span></a>
         </div>
       </div>
 
@@ -36,7 +36,7 @@
           <span class="preview-avatar" aria-hidden="true">JL</span>
           <div class="preview-conversation-copy">
             <p class="preview-author">Jordan Lee <span>just now</span></p>
-            <p class="preview-text">You are such an <mark class="preview-mark" id="hero-preview-phrase">idiot</mark> for suggesting that.</p>
+            <p class="preview-text" aria-live="polite">You are such an <mark class="preview-mark" id="hero-preview-phrase">idiot</mark> for suggesting that.</p>
           </div>
         </div>
         <div class="preview-controls" role="group" aria-label="Preview phrase">
@@ -51,6 +51,7 @@
     <section class="page-shell section-block analyzer-section" id="analyzer" aria-labelledby="analyzer-title" tabindex="-1">
       <div class="section-heading">
         <h2 id="analyzer-title">Message analyzer</h2>
+        <p>Write or paste a message to review potentially harmful language.</p>
       </div>
       <ol class="guided-steps" aria-label="Analyzer steps">
         <li data-guided-step="enter" aria-current="step"><span class="guided-number">1</span><span class="guided-label">Enter</span></li>
@@ -76,7 +77,7 @@
             <h3 class="example-label">Try a scenario</h3>
             <div class="example-buttons">
               <button class="example-button" type="button" data-example="Thanks for explaining your idea." aria-pressed="false">
-                <span class="example-name">Friendly</span><small>No flags</small>
+                <span class="example-name">Friendly</span><small>No harmful language</small>
               </button>
               <button class="example-button example-button-recommended" type="button" data-example="You are such an idiot." aria-pressed="false">
                 <span class="example-name">Direct insult</span><small>Recommended · Single phrase</small>
@@ -85,10 +86,10 @@
                 <span class="example-name">Multiple</span><small>Multiple phrases</small>
               </button>
               <button class="example-button" type="button" data-example="You are an ｉｄｉｏｔ." aria-pressed="false">
-                <span class="example-name">Evasion</span><small>Unicode</small>
+                <span class="example-name">Evasion</span><small>Obfuscated text</small>
               </button>
               <button class="example-button" type="button" data-example="I will hurt you." aria-pressed="false">
-                <span class="example-name">High severity</span><small>Safety case</small>
+                <span class="example-name">High severity</span><small>Safety-sensitive language</small>
               </button>
             </div>
             <p class="example-status" id="example-status" aria-live="polite" hidden></p>
@@ -98,14 +99,14 @@
         <section class="result-card card" id="analyzer-result" aria-labelledby="result-title" aria-live="polite" aria-busy="false">
           <div class="result-header">
             <div>
-              <h3 id="result-title">Analysis</h3>
+              <h3 id="result-title">Your result</h3>
               <p class="result-source" id="result-source" hidden></p>
             </div>
             <span class="result-badge result-badge-neutral" id="result-badge">Ready</span>
           </div>
           <div class="result-placeholder" id="result-placeholder">
             <div class="result-placeholder-icon" aria-hidden="true">✦</div>
-            <p>Your result will appear here.</p>
+            <p>Choose a scenario or write your own message to begin.</p>
           </div>
           <div class="result-preview" id="result-preview" hidden>
             <p class="result-label" id="result-label">Message preview</p>
@@ -118,14 +119,15 @@
         <div class="protection-preview-header">
           <div>
             <h3 id="protection-preview-title">Protection preview</h3>
+            <p>Compare the original message with phrase-level protection.</p>
           </div>
           <div class="preview-toggle" role="group" aria-label="Protection preview mode">
             <button class="preview-toggle-button" id="preview-without-button" type="button" aria-pressed="true">Original</button>
             <button class="preview-toggle-button" id="preview-with-button" type="button" aria-pressed="false">Protected</button>
           </div>
         </div>
-        <div class="preview-message-panel" id="preview-without" aria-label="Message without protection"></div>
-        <div class="preview-message-panel" id="preview-with" aria-label="Message with protection" hidden></div>
+        <div class="preview-message-panel" id="preview-without" aria-label="Original message"></div>
+        <div class="preview-message-panel" id="preview-with" aria-label="Protected message" hidden></div>
       </section>
     </section>
 
@@ -133,6 +135,7 @@
       <div class="section-heading section-heading-row">
         <div>
           <h2 id="demo-title">Browser demo</h2>
+          <p>Open a flagged phrase to review its details and choose what to see.</p>
         </div>
       </div>
 
@@ -147,6 +150,8 @@
           </div>
         </div>
         <div class="article-body">
+          <h3 class="thread-topic">Community workspace launch timeline</h3>
+          <p class="thread-topic-meta">Product feedback <span aria-hidden="true">·</span> 4 participants</p>
           <div class="thread-post">
             <div class="thread-person">
               <span class="avatar avatar-blue" aria-hidden="true">AM</span>
@@ -189,8 +194,8 @@
       <div class="prototype-notes-content">
         <details>
           <summary>Privacy &amp; limitations</summary>
-          <p><strong>Local processing:</strong> Analyzer text is sent only to Ollama on this computer, with a local rules fallback if unavailable. Webpage text stays local.</p>
-          <p><strong>Limitations:</strong> Results may be inaccurate and may not understand negation, quotation, reported speech, sarcasm, or intent. Alternatives are suggestions.</p>
+          <p><strong>Privacy:</strong> Your message is processed on this device during the demo. Webpage text stays in your browser.</p>
+          <p><strong>Limitations:</strong> This prototype may miss context such as sarcasm, quotation, or intent. Suggestions may not fit every conversation.</p>
         </details>
       </div>
     </details>

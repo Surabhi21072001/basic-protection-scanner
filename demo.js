@@ -63,7 +63,7 @@ function setResultSource(detectionResult) {
   } else {
     resultSource.textContent = "Local AI analysis";
   }
-  resultSource.hidden = false;
+  resultSource.hidden = true;
 }
 
 function getFallbackReasonLabel(reason) {
@@ -160,7 +160,7 @@ function showEmptyState(state = "IDLE") {
   const message = document.createElement("p");
   message.textContent = state === "CLEAR"
     ? "Message and results cleared."
-    : "Your result will appear here.";
+    : "Choose a scenario or write your own message to begin.";
   resultPlaceholder.append(icon, message);
   resultPlaceholder.hidden = false;
   resultPreview.hidden = true;
@@ -171,7 +171,7 @@ function showEmptyState(state = "IDLE") {
 function showCleanState(detectionResult) {
   setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
   setResultSource(detectionResult);
-  resultTitle.textContent = "No flags";
+  resultTitle.textContent = "No potentially harmful language detected";
   resultBadge.textContent = "Clean";
   resultBadge.className = "result-badge result-badge-safe";
   resultPlaceholder.hidden = false;
@@ -181,16 +181,16 @@ function showCleanState(detectionResult) {
   indicator.setAttribute("aria-hidden", "true");
   indicator.textContent = "✓";
   const message = document.createElement("p");
-  message.textContent = "No phrases flagged.";
+  message.textContent = "No phrases were flagged in this message.";
   resultPlaceholder.append(indicator, message);
   resultPreview.hidden = true;
 }
 
 function showLoadingState() {
   setAnalyzerState("LOADING");
-  resultSource.textContent = "Local AI analysis";
-  resultSource.hidden = false;
-  resultTitle.textContent = "Analyzing…";
+  resultSource.textContent = "";
+  resultSource.hidden = true;
+  resultTitle.textContent = "Reviewing your message…";
   resultBadge.textContent = "Working";
   resultBadge.className = "result-badge result-badge-neutral";
   resultPlaceholder.replaceChildren();
@@ -222,7 +222,7 @@ function showAnalysisError() {
 function showDetectedState(text, detectionResult) {
   setAnalyzerState(detectionResult.source === "rules" ? "RULE_RESULT" : "AI_RESULT");
   setResultSource(detectionResult);
-  resultTitle.textContent = "Phrase flagged";
+  resultTitle.textContent = "Potentially harmful language detected";
   resultBadge.textContent = detectionResult.matches.length + " flag" +
     (detectionResult.matches.length === 1 ? "" : "s");
   resultBadge.className = "result-badge result-badge-warning";
@@ -251,19 +251,19 @@ function showDetectedState(text, detectionResult) {
 
     const severity = document.createElement("span");
     severity.className = "result-match-metadata";
-    severity.textContent = "Prototype severity: " + getSeverityLabel(match.severity);
+    severity.textContent = "Severity: " + getSeverityLabel(match.severity);
 
     const whyTitle = document.createElement("strong");
     whyTitle.className = "result-match-why-title";
-    whyTitle.textContent = "Why was this phrase flagged?";
+    whyTitle.textContent = "Why this may be harmful";
 
     const why = document.createElement("span");
     why.className = "result-match-metadata";
-    why.textContent = match.explanation || getRuleExplanation(match.category);
+    why.textContent = getPresentationExplanation(match.category);
 
     const alternative = document.createElement("span");
     alternative.className = "result-match-alternative";
-    alternative.textContent = "Alternative: " + getDemoAlternative(match);
+    alternative.textContent = "Suggested alternative: " + getDemoAlternative(match);
 
     detail.append(phraseLabel, phrase, category, severity, whyTitle, why, alternative);
     resultDetail.appendChild(detail);
@@ -296,12 +296,20 @@ function getSeverityLabel(severity) {
   return labels[severity] || "Unrated prototype rule";
 }
 
-function getRuleExplanation(category) {
-  return "This phrase matches a local rule categorized as " +
-    getCategoryLabel(category).toLowerCase() + ".";
+function getPresentationExplanation(category) {
+  const explanations = {
+    insult: "This wording may come across as a personal attack.",
+    profanity: "This word may be hurtful or upsetting to some readers.",
+    "hostile language": "This wording may sound dismissive or confrontational.",
+    threat: "This wording may be read as a threat.",
+    "self-harm encouragement": "This wording may encourage someone to harm themselves.",
+    "negative self-talk": "This wording expresses a negative judgment about yourself.",
+    "other negative language": "This wording may be interpreted as negative."
+  };
+  return explanations[category] || "This wording may be interpreted as harmful.";
 }
 
-function renderProtectionPreview(mode) {
+function renderProtectionPreview(mode, userSelected = false) {
   if (!currentAnalysis) return;
 
   protectionPreview.dataset.mode = mode;
@@ -309,7 +317,7 @@ function renderProtectionPreview(mode) {
   previewWith.hidden = mode !== "with";
   previewWithoutButton.setAttribute("aria-pressed", String(mode === "without"));
   previewWithButton.setAttribute("aria-pressed", String(mode === "with"));
-  if (mode === "with") setGuidedStep("choose");
+  if (userSelected) setGuidedStep("choose");
 }
 
 function showProtectionPreview(text, detectionResult) {
@@ -422,8 +430,8 @@ document.querySelectorAll("[data-example]").forEach((button) => {
   });
 });
 
-previewWithoutButton.addEventListener("click", () => renderProtectionPreview("without"));
-previewWithButton.addEventListener("click", () => renderProtectionPreview("with"));
+previewWithoutButton.addEventListener("click", () => renderProtectionPreview("without", true));
+previewWithButton.addEventListener("click", () => renderProtectionPreview("with", true));
 
 function setHeroPreviewMode(mode) {
   const showOriginal = mode === "original";
