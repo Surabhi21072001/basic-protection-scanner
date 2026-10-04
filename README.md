@@ -25,8 +25,8 @@ basic-protection-scanner/
 ├── flagging.css           # Styling for extension-injected phrase controls
 ├── popup.html             # Per-tab scan summary markup
 ├── popup.js               # Reads and displays the active tab's summary
-├── test-page.html         # Standalone analyzer and browser-protection demo
-├── demo.js                # Analyzer and preview UI behavior
+├── test-page.html         # Analyzer, browser demo, and prototype notes
+├── demo.js                # Analyzer states and interactive previews
 ├── demo.css               # Demo page styles
 ├── package.json           # Test commands and development dependencies
 ├── tests/
@@ -57,9 +57,10 @@ basic-protection-scanner/
 - **`content.js`** performs one initial scan of eligible visible
   paragraph-like elements. It detects each element's direct text, then inserts
   user controls for matches that fit within a single text node. Matches that
-  span nested or multiple text nodes are skipped. Dynamic page changes are not
-  observed or rescanned automatically. Normal operation does not log raw page
-  text or live DOM elements.
+  span nested or multiple text nodes are not marked, though they remain part of
+  the detector's match count. Dynamic page changes are not observed or rescanned
+  automatically. Normal operation does not log raw page text or live DOM
+  elements.
 - **`flagging.css`** styles the injected controls. Users can show or hide the
   original phrase or view a local prototype alternative; content is not
   permanently removed.
@@ -67,14 +68,17 @@ basic-protection-scanner/
   that tab's content script. The summary stays in that tab's content-script
   memory and contains counts, not page text. Chrome-restricted pages may not
   allow the content script to run.
-- **`test-page.html`, `ollama.js`, `demo.js`, and `demo.css`** provide a
-  standalone demo. The analyzer sends explicitly submitted text to a local
-  `llama3.2:1b` model and validates its schema, category, severity, phrase,
-  source offsets, and overlaps before rendering. A validation or connection
-  failure falls back to the deterministic detector. Its Protection Preview
-  uses whichever engine's validated result is active. The discussion thread is
-  ordinary page markup intended to demonstrate the extension's injected
-  controls when the extension is installed and enabled for that page.
+- **`test-page.html`, `ollama.js`, `demo.js`, and `demo.css`** provide the
+  product demo. The page opens with a compact Analyzer/Browser route and an
+  interactive Original/Alternative browser preview. The analyzer offers
+  Friendly, Direct insult, Multiple, Evasion, and High severity scenarios;
+  its Protection Preview uses the validated result currently selected by the
+  analyzer. Submitted text is sent to the local `llama3.2:1b` model and the
+  response's schema, category, severity, phrase, source offsets, and overlaps
+  are validated before rendering. A validation or connection failure falls
+  back to the deterministic detector. The discussion thread is ordinary page
+  markup intended to demonstrate the extension's injected controls when the
+  extension is installed and enabled for that page.
 
 The detector returns a DOM-independent result shaped like:
 
@@ -168,7 +172,10 @@ the terminal's IPv6 address such as `http://[::]:8000`. Those addresses can
 cause Ollama requests to fail with `Failed to fetch`.
 
 The Interactive Analyzer works without installing the Chrome extension. Text
-submitted to the analyzer is sent only to Ollama on this computer.
+submitted to the analyzer is sent only to Ollama on this computer; if Ollama is
+unavailable or returns invalid output, local phrase rules provide the fallback.
+Use the page's **About this prototype** disclosure for the privacy and
+limitations note.
 
 ## Load Browser Protection in Chrome
 

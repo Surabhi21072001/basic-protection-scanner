@@ -130,6 +130,18 @@ function getSeverityLabel(severity) {
   return labels[severity] || "Unrated";
 }
 
+function getPhraseExplanation(category) {
+  const explanations = {
+    insult: "This wording may come across as a personal attack.",
+    profanity: "This word may be hurtful or upsetting to some readers.",
+    "hostile language": "This wording may sound dismissive or confrontational.",
+    threat: "This wording may be read as a threat.",
+    "self-harm encouragement": "This wording may encourage someone to harm themselves.",
+    "negative self-talk": "This wording expresses a negative judgment about yourself."
+  };
+  return explanations[category] || "This wording may be interpreted as harmful.";
+}
+
 function setFlagState(marker, state) {
   const original = marker.querySelector("[data-bps-original]");
   const safer = marker.querySelector("[data-bps-safer]");
@@ -193,16 +205,15 @@ function addFlagControls(marker, match, originalNode) {
   const summary = document.createElement("span");
   summary.className = "bps-flag-summary";
   summary.textContent = "Category: " + getCategoryLabel(match.category) +
-    " · Prototype severity: " + getSeverityLabel(match.severity);
+    " · Severity: " + getSeverityLabel(match.severity);
 
   const whyTitle = document.createElement("strong");
   whyTitle.className = "bps-flag-summary";
-  whyTitle.textContent = "Why was this phrase flagged?";
+  whyTitle.textContent = "Why this may be harmful";
 
   const description = document.createElement("span");
   description.className = "bps-flag-description";
-  description.textContent = "This phrase matches a local rule categorized as " +
-    match.category + ".";
+  description.textContent = getPhraseExplanation(match.category);
 
   const originalDetail = document.createElement("span");
   originalDetail.className = "bps-flag-detail";
@@ -210,7 +221,7 @@ function addFlagControls(marker, match, originalNode) {
 
   const saferDetail = document.createElement("span");
   saferDetail.className = "bps-flag-detail bps-flag-detail-safe";
-  saferDetail.textContent = "Prototype safer alternative: " + getSaferVersion(match);
+  saferDetail.textContent = "Suggested alternative: " + getSaferVersion(match);
 
   const controls = document.createElement("span");
   controls.className = "bps-flag-actions";
@@ -322,7 +333,7 @@ function flagMatches(textNodes, matches) {
 
 /**
  * Scan eligible elements in the document once.
- * Returns a summary object: { scannedCount, matches: [...] }
+ * Returns a summary object: { scannedCount, harmfulCount }.
  */
 function scanPage() {
   const elements = document.querySelectorAll(READABLE_SELECTORS.join(","));
