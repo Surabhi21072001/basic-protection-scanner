@@ -27,8 +27,137 @@ const heroPreviewPhrase = document.getElementById("hero-preview-phrase");
 const heroOriginalButton = document.getElementById("hero-original-button");
 const heroAlternativeButton = document.getElementById("hero-alternative-button");
 const guidedSteps = document.querySelectorAll("[data-guided-step]");
+const childModeToggle = document.getElementById("child-mode-toggle");
 let currentAnalysis = null;
 let analysisRequestId = 0;
+
+/**
+ * Child Mode (demo-only, additive layer)
+ * --------------------------------------
+ * When enabled, Child Mode augments an existing detection result WITHOUT
+ * changing detector.js or the AI adapter. It:
+ *   - flags a small set of extra terms that are mild for adults but worth
+ *     surfacing for younger users (additive; never removes existing matches),
+ *   - raises the displayed severity of low-severity flags one level,
+ *   - makes the Protected preview the default view.
+ *
+ * It never mutates the original detection result object. It derives a new,
+ * child-aware result so turning the mode off restores identical behavior.
+ */
+const CHILD_MODE_STORAGE_KEY = "bps:child-mode";
+
+// Mild supplemental terms, only consulted when Child Mode is on. Edit freely.
+const CHILD_SUPPLEMENTAL_RULES = [
+  { phrase: "hate", category: "hostile language", severity: "low" },
+  { phrase: "ugly", category: "insult", severity: "low" },
+  { phrase: "jerk", category: "insult", severity: "low" },
+  { phrase: "dumb", category: "insult", severity: "low" },
+  { phrase: "sucks", category: "hostile language", severity: "low" },
+  { phrase: "crap", category: "profanity", severity: "low" }
+];
+
+function isChildModeEnabled() {
+  return Boolean(childModeToggle && childModeToggle.checked);
+}
+
+function readStoredChildMode() {
+  try {
+    return window.localStorage.getItem(CHILD_MODE_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredChildMode(enabled) {
+  try {
+    window.localStorage.setItem(CHILD_MODE_STORAGE_KEY, enabled ? "on" : "off");
+  } catch {
+    // Storage may be unavailable (private mode / file://). The toggle still
+    // works for the current session; persistence is best-effort only.
+  }
+}
+
+function escapeChildRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Whole-word, case-insensitive, Unicode-aware matching, mirroring detector.js
+// so supplemental terms behave consistently with the core rules.
+function findChildSupplementalMatches(text) {
+  const source = typeof text === "string" ? text : "";
+  const matches = [];
+
+  CHILD_SUPPLEMENTAL_RULES.forEach((rule) => {
+    const pattern = new RegExp(
+      "(^|[^\\p{L}\\p{N}\\p{M}_])" +
+        escapeChildRegExp(rule.phrase) +
+        "(?=$|[^\\p{L}\\p{N}\\p{M}_])",
+      "giu"
+    );
+    let match;
+    while ((match = pattern.exec(source)) !== null) {
+      const startIndex = match.index + match[1].length;
+      const endIndex = startIndex + rule.phrase.length;
+      matches.push({
+        phrase: source.slice(startIndex, endIndex),
+        category: rule.category,
+        severity: rule.severity,
+        startIndex,
+        endIndex,
+        replacement: getDemoAlternative({ category: rule.category }),
+        childAdded: true
+      });
+      if (match[0].length === 0) pattern.lastIndex += 1;
+    }
+  });
+
+  return matches;
+}
+
+function bumpSeverityForChild(severity) {
+  if (severity === "low") return "medium";
+  if (severity === "medium") return "high";
+  return severity;
+}
+
+/**
+ * Produce a child-aware copy of a detection result. The input result is never
+ * mutated, so disabling Child Mode restores the exact original behavior.
+ */
+function applyChildMode(detectionResult) {
+  if (!isChildModeEnabled() || !detectionResult) return detectionResult;
+
+  const baseMatches = Array.isArray(detectionResult.matches)
+    ? detectionResult.matches
+    : [];
+
+  // Raise the displayed severity of existing flags for a child-facing view.
+  const bumped = baseMatches.map((match) => ({
+    ...match,
+    severity: bumpSeverityForChild(match.severity),
+    childBumped: match.severity === "low" || match.severity === "medium"
+  }));
+
+  // Add supplemental matches that do not overlap an existing flag.
+  const text = detectionResult.originalText || "";
+  const supplemental = findChildSupplementalMatches(text).filter((candidate) =>
+    !bumped.some((existing) =>
+      candidate.startIndex < existing.endIndex &&
+      candidate.endIndex > existing.startIndex
+    )
+  );
+
+  const matches = bumped
+    .concat(supplemental)
+    .sort((left, right) => left.startIndex - right.startIndex);
+
+  return {
+    ...detectionResult,
+    matches,
+    detected: matches.length > 0,
+    childMode: true
+  };
+}
 const ANALYZER_STATES = new Set([
   "IDLE",
   "LOADING",
@@ -336,7 +465,10 @@ function showProtectionPreview(text, detectionResult) {
   }
 
   protectionPreview.hidden = false;
-  renderProtectionPreview("without");
+  // Child Mode defaults to the protected view so harmful phrases start hidden.
+  renderProtectionPreview(
+    isChildModeEnabled() && detectionResult.matches.length ? "with" : "without"
+  );
 }
 
 async function analyzeText() {
@@ -362,10 +494,12 @@ async function analyzeText() {
     )) {
       throw new Error("Analyzer unavailable.");
     }
-    const detectionResult = typeof scanner.analyzeText === "function"
+    const rawResult = typeof scanner.analyzeText === "function"
       ? await scanner.analyzeText(text, "local-ai")
       : scanner.analyzeWithRules(text);
     if (requestId !== analysisRequestId) return;
+
+    const detectionResult = applyChildMode(rawResult);
 
     setGuidedStep("review");
     if (detectionResult.detected) {
@@ -444,6 +578,28 @@ function setHeroPreviewMode(mode) {
 
 heroOriginalButton.addEventListener("click", () => setHeroPreviewMode("original"));
 heroAlternativeButton.addEventListener("click", () => setHeroPreviewMode("alternative"));
+
+function reflectChildModeState() {
+  const enabled = isChildModeEnabled();
+  document.body.dataset.childMode = String(enabled);
+  if (childModeToggle) childModeToggle.setAttribute("aria-checked", String(enabled));
+}
+
+if (childModeToggle) {
+  // Restore the saved preference, defaulting to OFF so behavior is unchanged
+  // unless the user opted in previously.
+  childModeToggle.checked = readStoredChildMode();
+  reflectChildModeState();
+
+  childModeToggle.addEventListener("change", () => {
+    writeStoredChildMode(childModeToggle.checked);
+    reflectChildModeState();
+    // Re-run analysis live if there is text, so the view reflects the new mode.
+    if (analyzerInput.value.trim()) {
+      analyzeText();
+    }
+  });
+}
 
 handleInputChange();
 

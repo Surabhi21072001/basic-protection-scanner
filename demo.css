@@ -2616,3 +2616,84 @@ h3 {
     transform: none;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Child Mode (demo-only, additive feature)
+   ------------------------------------------------------------------------- */
+.child-mode-switch {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+/* Hide the native checkbox but keep it accessible and focusable. */
+.child-mode-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.child-mode-track {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 auto;
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.child-mode-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+
+.child-mode-switch input:checked + .child-mode-track {
+  background: var(--color-indigo);
+}
+
+.child-mode-switch input:checked + .child-mode-track::after {
+  transform: translateX(16px);
+}
+
+.child-mode-switch input:focus-visible + .child-mode-track {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+}
+
+.child-mode-switch input:checked ~ .child-mode-text {
+  color: var(--color-indigo-dark);
+}
+
+.child-mode-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin: var(--space-1) 0 var(--space-3);
+}
+
+/* When Child Mode is active, give the analyzer a subtle protective accent. */
+body[data-child-mode="true"] .analyzer-form {
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 1px var(--color-indigo-soft), var(--shadow-sm);
+}

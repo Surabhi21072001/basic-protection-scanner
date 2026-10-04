@@ -63,7 +63,15 @@
         <form class="analyzer-form card" id="analyzer-form" novalidate>
           <div class="form-title-row">
             <label for="analyzer-input">Your message</label>
+            <label class="child-mode-switch" for="child-mode-toggle">
+              <input type="checkbox" id="child-mode-toggle" role="switch" aria-checked="false" />
+              <span class="child-mode-track" aria-hidden="true"></span>
+              <span class="child-mode-text">Child Mode</span>
+            </label>
           </div>
+          <p class="child-mode-hint" id="child-mode-hint">
+            Child Mode flags extra mild terms, raises severity, and hides flagged phrases by default.
+          </p>
           <textarea id="analyzer-input" name="analyzer-input" rows="6" maxlength="500" placeholder="Write or paste a message…"></textarea>
           <div class="input-meta">
             <span>500 character limit</span>
